@@ -40,6 +40,11 @@ enum Command {
 
 fn main() {
     let args = Args::parse();
+
+    if !which::which("age").is_ok() {
+        panic!("The 'age' command is required but it's not installed or not found in the PATH.");
+    }
+
     let mut dir = args.config_dir;
     if dir == "" {
         dir = env::var("HOME").unwrap() + "/.age-env";
