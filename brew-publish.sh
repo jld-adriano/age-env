@@ -14,5 +14,7 @@ echo "Creating $tar_file"
 (cd target/release && tar -czf ../../dist.generated/$tar_file age-env)
 shasum -a 256 dist.generated/$tar_file > dist.generated/$tar_file.sha256
 
-age-env --version
-age-env run-with-env gh -- gh release create "v0.1.0" --generate-notes dist.generated/$tar_file dist.generated/$tar_file.sha256
+
+
+version=$(age-env --version | cut -d' ' -f2)
+age-env run-with-env gh -- gh release create "v$version" --generate-notes dist.generated/$tar_file dist.generated/$tar_file.sha256
