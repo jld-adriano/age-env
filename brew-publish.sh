@@ -2,6 +2,14 @@
 
 set -eo pipefail
 
+# Bump Cargo.toml version
+if git diff --quiet Cargo.toml; then
+    current_version=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+    new_version=$(echo $current_version | awk -F. -v OFS=. '{$NF += 1 ; print}')
+    sed -i -e "s/version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
+fi
+
+
 rm -rf dist.generated
 mkdir -p dist.generated
 
@@ -28,5 +36,14 @@ git add Formula
 git commit -m "Bump version to $version"
 cd ..
 git add homebrew-age-env
-git commit -m "Bump homebrew-age-env submodule"
-echo "Don't forget to push both repos!"
+git add Cargo.toml Cargo.lock
+git commit -m "Bump version to $version"
+
+echo "Should I push both repos? (y/n)"
+read -r answer
+if [ "$answer" = "y" ]; then
+    cd homebrew-age-env
+    git push
+    cd ..
+    git push
+fi
