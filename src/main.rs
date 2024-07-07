@@ -177,7 +177,7 @@ fn main() {
                 }
                 None => {
                     let mut stdin = String::new();
-                    std::io::stdin().read_line(&mut stdin).unwrap();
+                    std::io::stdin().read_to_string(&mut stdin).unwrap();
                     stdin
                 }
             };
