@@ -3,6 +3,14 @@
 ## Description
 `age-env` is a tool for managing encrypted environments for the age encryption tool.
 
+## Installation
+
+### Homebrew
+```
+brew tap jld-adriano/age-env
+brew install age-env
+```
+
 ## Usage
 
 ### Commands
