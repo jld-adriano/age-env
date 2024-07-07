@@ -268,7 +268,7 @@ fn main() {
             }
             let mut contents = Vec::new();
             child.stdout.unwrap().read_to_end(&mut contents).unwrap();
-            println!("contents: {:?}", contents);
+
             let source = &String::from_utf8(contents).unwrap();
             let parsed_env = dotenv_parser::parse_dotenv(source).unwrap();
 
