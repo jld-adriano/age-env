@@ -77,12 +77,12 @@ fn main() {
 
     let dir = Path::new(&args.config_dir);
     if !dir.exists() {
-        fs::create_dir(&dir).unwrap();
+        fs::create_dir(&dir).expect("Failed to create config directory");
     }
 
     let envs_dir = dir.join("envs");
     if !envs_dir.exists() {
-        fs::create_dir(&envs_dir).unwrap();
+        fs::create_dir(&envs_dir).expect("Failed to create envs directory");
     }
 
     let valid_pre_init_commands = vec![Command::AddIdentity, Command::AddRecipient];
@@ -106,31 +106,47 @@ fn main() {
     match args.command {
         Command::AddIdentity => {
             let mut identities_file = match identities_file.exists() {
-                true => File::options().append(true).open(&identities_file).unwrap(),
-                false => File::create(&identities_file).unwrap(),
+                true => File::options()
+                    .append(true)
+                    .open(&identities_file)
+                    .expect("Failed to open identities file for appending"),
+                false => File::create(&identities_file).expect("Failed to create identities file"),
             };
 
             let mut identities = String::new();
-            std::io::stdin().read_to_string(&mut identities).unwrap();
-            identities_file.write_all(identities.as_bytes()).unwrap();
+            std::io::stdin()
+                .read_to_string(&mut identities)
+                .expect("Failed to read identities from stdin");
+            identities_file
+                .write_all(identities.as_bytes())
+                .expect("Failed to write identities to file");
         }
         Command::AddRecipient => {
             let mut recipients_file = match global_recipients_file.exists() {
                 true => File::options()
                     .append(true)
                     .open(&global_recipients_file)
-                    .unwrap(),
-                false => File::create(&global_recipients_file).unwrap(),
+                    .expect("Failed to open recipients file for appending"),
+                false => {
+                    File::create(&global_recipients_file).expect("Failed to create recipients file")
+                }
             };
 
             let mut recipients = String::new();
-            std::io::stdin().read_to_string(&mut recipients).unwrap();
-            recipients_file.write_all(recipients.as_bytes()).unwrap();
+            std::io::stdin()
+                .read_to_string(&mut recipients)
+                .expect("Failed to read recipients from stdin");
+            recipients_file
+                .write_all(recipients.as_bytes())
+                .expect("Failed to write recipients to file");
         }
         Command::List => {
-            let files = fs::read_dir(&envs_dir).unwrap();
+            let files = fs::read_dir(&envs_dir).expect("Failed to read envs directory");
             for file in files {
-                println!("{:?}", file.unwrap().path());
+                println!(
+                    "{:?}",
+                    file.expect("Failed to read file in envs directory").path()
+                );
             }
         }
         Command::Create {
@@ -170,30 +186,39 @@ fn main() {
             // Read the environment contents from either mode
             let env_contents = match env_file {
                 Some(file) => {
-                    let mut file = File::open(&file).unwrap();
+                    let mut file = File::open(&file).expect("Failed to open env file");
                     let mut contents = String::new();
-                    file.read_to_string(&mut contents).unwrap();
+                    file.read_to_string(&mut contents)
+                        .expect("Failed to read env file");
                     contents
                 }
                 None => {
                     let mut stdin = String::new();
-                    std::io::stdin().read_to_string(&mut stdin).unwrap();
+                    std::io::stdin()
+                        .read_to_string(&mut stdin)
+                        .expect("Failed to read env from stdin");
                     stdin
                 }
             };
 
-            let mut file = File::create(&file_path).unwrap();
-            file.write_all(env_contents.as_bytes()).unwrap();
+            let mut file = File::create(&file_path).expect("Failed to create environment file");
+            file.write_all(env_contents.as_bytes())
+                .expect("Failed to write environment contents to file");
 
             let mut child = age_command
                 .stdin(std::process::Stdio::piped())
                 .spawn()
-                .unwrap();
+                .expect("Failed to spawn age command");
             {
-                let stdin = child.stdin.as_mut().unwrap();
-                stdin.write_all(env_contents.as_bytes()).unwrap();
+                let stdin = child
+                    .stdin
+                    .as_mut()
+                    .expect("Failed to open stdin for age command");
+                stdin
+                    .write_all(env_contents.as_bytes())
+                    .expect("Failed to write environment contents to age command");
             }
-            let status = child.wait().unwrap();
+            let status = child.wait().expect("Failed to wait for age command");
             if status.success() {
                 println!("Created environment {} in {:?}", name, file_path);
             } else {
@@ -203,7 +228,7 @@ fn main() {
         Command::Delete { name } => {
             let file = envs_dir.join(name.clone());
             if file.exists() {
-                fs::remove_file(&file).unwrap();
+                fs::remove_file(&file).expect("Failed to delete environment file");
                 println!("Deleted environment {:?}", file);
             } else {
                 println!("Environment {:?} does not exist", file);
@@ -211,26 +236,38 @@ fn main() {
         }
         Command::DeleteAll => {
             println!("Deleting all environments in {:?}\n", envs_dir);
-            let files = fs::read_dir(&envs_dir).unwrap().collect::<Vec<_>>();
+            let files = fs::read_dir(&envs_dir)
+                .expect("Failed to read envs directory")
+                .collect::<Vec<_>>();
             if files.len() == 0 {
                 println!("No environments to delete");
                 return;
             }
             println!("List:");
             for file in files.iter() {
-                println!("{:?}", file.as_ref().unwrap().path());
+                println!(
+                    "{:?}",
+                    file.as_ref()
+                        .expect("Failed to read file in envs directory")
+                        .path()
+                );
             }
             println!(
                 "\nAre you sure you want to delete all files in {:?}? (y/n)",
                 dir
             );
             let mut input = String::new();
-            std::io::stdin().read_line(&mut input).unwrap();
+            std::io::stdin()
+                .read_line(&mut input)
+                .expect("Failed to read input from stdin");
             if input.trim().eq_ignore_ascii_case("y") {
                 for file in files.iter() {
-                    let file = file.as_ref().unwrap().path();
+                    let file = file
+                        .as_ref()
+                        .expect("Failed to read file in envs directory")
+                        .path();
                     if file.is_file() {
-                        fs::remove_file(&file).unwrap();
+                        fs::remove_file(&file).expect("Failed to delete file");
                         println!("Deleted file {:?}", file);
                     }
                 }
@@ -244,7 +281,7 @@ fn main() {
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
-            let file_contents = fs::read(&file).unwrap();
+            let file_contents = fs::read(&file).expect("Failed to read environment file");
             let mut child = std::process::Command::new("age")
                 .arg("-d")
                 .arg("--identity")
@@ -252,25 +289,36 @@ fn main() {
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::piped())
                 .spawn()
-                .unwrap();
+                .expect("Failed to spawn age command");
             {
-                let stdin = child.stdin.as_mut().unwrap();
-                stdin.write_all(&file_contents).unwrap();
+                let stdin = child
+                    .stdin
+                    .as_mut()
+                    .expect("Failed to open stdin for age command");
+                stdin
+                    .write_all(&file_contents)
+                    .expect("Failed to write environment contents to age command");
             }
-            let status = child.wait().unwrap();
+            let status = child.wait().expect("Failed to wait for age command");
             if !status.success() {
                 panic!(
                     "Failed to run command with environment {}: {}: stderr: {:?}",
                     name,
                     status,
-                    child.stderr.unwrap()
+                    child
+                        .stderr
+                        .expect("Failed to read stderr from age command")
                 );
             }
             let mut contents = Vec::new();
-            child.stdout.unwrap().read_to_end(&mut contents).unwrap();
+            child
+                .stdout
+                .expect("Failed to open stdout for age command")
+                .read_to_end(&mut contents)
+                .expect("Failed to read stdout from age command");
 
-            let source = &String::from_utf8(contents).unwrap();
-            let parsed_env = dotenv_parser::parse_dotenv(source).unwrap();
+            let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
+            let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
 
             let mut command_process = std::process::Command::new(command[0].clone());
 
@@ -279,11 +327,14 @@ fn main() {
             }
             command_process.args(&command[1..]);
 
-            let mut child = command_process.spawn().unwrap();
-            child.wait().unwrap();
+            let mut child = command_process.spawn().expect(&format!(
+                "Failed to spawn command process: `{}`",
+                command[0]
+            ));
+            child.wait().expect("Failed to wait for command process");
         }
         Command::Reset => {
-            fs::remove_dir_all(&dir).unwrap();
+            fs::remove_dir_all(&dir).expect("Failed to remove config directory");
         }
         Command::Generate { shell } => {
             let mut cmd = Args::command();
