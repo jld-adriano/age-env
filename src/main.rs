@@ -41,6 +41,7 @@ enum Command {
         name: String,
     },
     DeleteAll,
+    Reset,
     RunWithEnv {
         /// Name of the environment to run with
         name: String,
@@ -195,8 +196,8 @@ fn main() {
             }
         }
         Command::DeleteAll => {
-            println!("Deleting all environments in {:?}\n", dir);
-            let files = fs::read_dir(&dir).unwrap().collect::<Vec<_>>();
+            println!("Deleting all environments in {:?}\n", envs_dir);
+            let files = fs::read_dir(&envs_dir).unwrap().collect::<Vec<_>>();
             if files.len() == 0 {
                 println!("No environments to delete");
                 return;
@@ -263,6 +264,9 @@ fn main() {
 
             let mut child = command_process.spawn().unwrap();
             child.wait().unwrap();
+        }
+        Command::Reset => {
+            fs::remove_dir_all(&dir).unwrap();
         }
     }
 }
