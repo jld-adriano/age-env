@@ -27,9 +27,13 @@ struct Args {
 
 #[derive(Parser, Debug)]
 enum Command {
+    /// Add a new identity to the global configuration
     AddIdentity,
+    /// Add a new recipient to the global configuration
     AddRecipient,
+    /// List all environments
     List,
+    /// Create a new environment
     Create {
         /// Name of the environment to create
         name: String,
@@ -40,18 +44,23 @@ enum Command {
         #[arg(short = 'R', long)]
         recipients_file: Option<String>,
     },
+    /// Delete an environment
     Delete {
         /// Name of the environment to delete
         name: String,
     },
+    /// Delete all environments
     DeleteAll,
+    /// Reset the installation
     Reset,
+    /// Run a command with the environment
     RunWithEnv {
         /// Name of the environment to run with
         name: String,
         #[arg(last = true)]
         command: Vec<String>,
     },
+    /// Generate shell completions
     Generate {
         /// The shell to generate completions for
         #[arg(value_enum)]

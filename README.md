@@ -10,14 +10,15 @@
 Usage: age-env [OPTIONS] <COMMAND>
 
 Commands:
-  add-identity   
-  add-recipient  
-  create         
-  run-with-env   
-  list           
-  delete         
-  delete-all
-  reset
+  add-identity   Add a new identity to the global configuration
+  add-recipient  Add a new recipient to the global configuration
+  list           List all environments
+  create         Create a new environment
+  delete         Delete an environment
+  delete-all     Delete all environments
+  reset          Reset the installation
+  run-with-env   Run a command with the environment
+  generate       Generate shell completions
   help           Print this message or the help of the given subcommand(s)
 
 Options:
