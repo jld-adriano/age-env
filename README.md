@@ -12,11 +12,12 @@ Usage: age-env [OPTIONS] <COMMAND>
 Commands:
   add-identity   
   add-recipient  
-  list           
   create         
-  delete         
-  delete-all     
   run-with-env   
+  list           
+  delete         
+  delete-all
+  reset
   help           Print this message or the help of the given subcommand(s)
 
 Options:
