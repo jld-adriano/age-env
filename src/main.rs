@@ -258,10 +258,13 @@ fn main() {
                 stdin.write_all(&file_contents).unwrap();
             }
             let status = child.wait().unwrap();
-            if status.success() {
-                println!("Created environment {} in {:?}", name, file);
-            } else {
-                panic!("Failed to create environment {} in {:?}", name, file);
+            if !status.success() {
+                panic!(
+                    "Failed to run command with environment {}: {}: stderr: {:?}",
+                    name,
+                    status,
+                    child.stderr.unwrap()
+                );
             }
             let mut contents = Vec::new();
             child.stdout.unwrap().read_to_end(&mut contents).unwrap();
