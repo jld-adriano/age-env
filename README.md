@@ -58,3 +58,5 @@ age-env run-with-env github-token -- gh repo list
 
 - Managing per env identities
 - Managing per env recipients
+- Publish proper brew pkg
+- Add nixpkg as well
