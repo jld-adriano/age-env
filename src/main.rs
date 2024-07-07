@@ -144,8 +144,11 @@ fn main() {
             let files = fs::read_dir(&envs_dir).expect("Failed to read envs directory");
             for file in files {
                 println!(
-                    "{:?}",
-                    file.expect("Failed to read file in envs directory").path()
+                    "{}",
+                    file.expect("Failed to read file in envs directory")
+                        .path()
+                        .to_str()
+                        .expect("Failed to convert path to string")
                 );
             }
         }
