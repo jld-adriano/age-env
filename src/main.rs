@@ -23,7 +23,8 @@ struct Args {
 
 #[derive(Parser, Debug)]
 enum Command {
-    Init,
+    AddIdentity,
+    AddRecipient,
     List,
     Create {
         /// Name of the environment to create
@@ -34,8 +35,6 @@ enum Command {
         recipient: Option<String>,
         #[arg(short = 'R', long)]
         recipients_file: Option<String>,
-        #[arg(short = 's', long)]
-        from_stdin: bool,
     },
     Delete {
         /// Name of the environment to delete
@@ -70,27 +69,48 @@ fn main() {
     if !envs_dir.exists() {
         fs::create_dir(&envs_dir).unwrap();
     }
+
+    let valid_pre_init_commands = vec![Command::AddIdentity, Command::AddRecipient];
+
+    #[allow(unused_variables)]
+    let is_pre_init_command = valid_pre_init_commands
+        .into_iter()
+        .any(|command| matches!(&args.command, command));
+
     let identities_file = dir.join("identities");
-    if !identities_file.exists() && !matches!(args.command, Command::Init) {
+    if !identities_file.exists() && !is_pre_init_command {
         panic!(
-            "Identities file {:?} does not exist. Run `age-env init` to create it.",
+            "Identities file {:?} does not exist. Run `age-env add-identity` to create it.",
             identities_file
         );
     }
 
+    let global_recipients_file = dir.join("recipients");
+    let global_recipients_file_exists = global_recipients_file.exists();
+
     match args.command {
-        Command::Init => {
-            if identities_file.exists() {
-                panic!(
-                    "Entities file {:?} already exists no need to init",
-                    identities_file
-                );
-            }
-            let mut identities_file = File::create(&identities_file).unwrap();
+        Command::AddIdentity => {
+            let mut identities_file = match identities_file.exists() {
+                true => File::options().append(true).open(&identities_file).unwrap(),
+                false => File::create(&identities_file).unwrap(),
+            };
 
             let mut identities = String::new();
             std::io::stdin().read_to_string(&mut identities).unwrap();
             identities_file.write_all(identities.as_bytes()).unwrap();
+        }
+        Command::AddRecipient => {
+            let mut recipients_file = match global_recipients_file.exists() {
+                true => File::options()
+                    .append(true)
+                    .open(&global_recipients_file)
+                    .unwrap(),
+                false => File::create(&global_recipients_file).unwrap(),
+            };
+
+            let mut recipients = String::new();
+            std::io::stdin().read_to_string(&mut recipients).unwrap();
+            recipients_file.write_all(recipients.as_bytes()).unwrap();
         }
         Command::List => {
             let files = fs::read_dir(&envs_dir).unwrap();
@@ -101,20 +121,11 @@ fn main() {
         Command::Create {
             name,
             from_env_file,
-            from_stdin,
             recipient,
             recipients_file,
         } => {
-            if recipient.is_some() && recipients_file.is_some() {
-                panic!("Cannot use both --recipient and --recipients-file");
-            }
-
             let file_path = envs_dir.join(name.clone());
             let env_file = from_env_file.map(|file| Path::new(&dir).join(file));
-
-            if from_stdin && env_file.is_some() {
-                panic!("Cannot use both --from-stdin and --from-env-file");
-            }
 
             if file_path.exists() {
                 panic!("Environment {:?} already exists", file_path);
@@ -122,37 +133,37 @@ fn main() {
 
             let mut age_command = std::process::Command::new("age");
 
-            match (recipient, recipients_file) {
-                (Some(recipient), None) => {
-                    age_command.arg("-r").arg(&recipient);
-                }
-                (None, Some(recipients_file)) => {
-                    age_command.arg("-R").arg(&recipients_file);
-                }
-                _ => {
-                    panic!(
-                        "Either --recipient or --recipients-file must be provided, but not both"
-                    );
-                }
+            if !global_recipients_file_exists && !recipient.is_some() && !recipients_file.is_some()
+            {
+                panic!(
+                    "Either --recipient or --recipients-file must be provided, or the global recipients file must be present"
+                );
+            }
+
+            if let Some(recipient) = recipient {
+                age_command.arg("-r").arg(&recipient);
+            }
+            if let Some(recipients_file) = recipients_file {
+                age_command.arg("-R").arg(&recipients_file);
+            }
+            if global_recipients_file_exists {
+                age_command.arg("-R").arg(&global_recipients_file);
             }
 
             age_command.arg("-o").arg(&file_path);
 
             // Read the environment contents from either mode
-            let env_contents = match from_stdin {
-                true => {
+            let env_contents = match env_file {
+                Some(file) => {
+                    let mut file = File::open(&file).unwrap();
+                    let mut contents = String::new();
+                    file.read_to_string(&mut contents).unwrap();
+                    contents
+                }
+                None => {
                     let mut stdin = String::new();
                     std::io::stdin().read_line(&mut stdin).unwrap();
                     stdin
-                }
-                false => match env_file {
-                    Some(file) => {
-                        let mut file = File::open(&file).unwrap();
-                        let mut contents = String::new();
-                        file.read_to_string(&mut contents).unwrap();
-                        contents
-                    }
-                    None => panic!("No environment file or stdin provided. one of --from-env-file or --from-stdin is required"),
                 }
             };
 
@@ -167,9 +178,12 @@ fn main() {
                 let stdin = child.stdin.as_mut().unwrap();
                 stdin.write_all(env_contents.as_bytes()).unwrap();
             }
-            child.wait().unwrap();
-
-            println!("Created environment {} in {:?}", name, file_path);
+            let status = child.wait().unwrap();
+            if status.success() {
+                println!("Created environment {} in {:?}", name, file_path);
+            } else {
+                panic!("Failed to create environment {} in {:?}", name, file_path);
+            }
         }
         Command::Delete { name } => {
             let file = envs_dir.join(name.clone());
@@ -228,7 +242,12 @@ fn main() {
                 let stdin = child.stdin.as_mut().unwrap();
                 stdin.write_all(&file_contents).unwrap();
             }
-            child.wait().unwrap();
+            let status = child.wait().unwrap();
+            if status.success() {
+                println!("Created environment {} in {:?}", name, file);
+            } else {
+                panic!("Failed to create environment {} in {:?}", name, file);
+            }
             let mut contents = Vec::new();
             child.stdout.unwrap().read_to_end(&mut contents).unwrap();
             println!("contents: {:?}", contents);
