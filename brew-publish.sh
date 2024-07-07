@@ -22,3 +22,11 @@ age-env run-with-env gh -- gh release create "v$version" --generate-notes dist.g
 sha256=$(cat dist.generated/$tar_file.sha256 | awk '{print $1}')
 sed -i -e "s|sha256 \".*\"|sha256 \"$sha256\"|g" ./homebrew-age-env/Formula/age-env.rb
 sed -i -e "s|version \".*\"|version \"$version\"|g" ./homebrew-age-env/Formula/age-env.rb
+
+cd homebrew-age-env
+git add Formula
+git commit -m "Bump version to $version"
+cd ..
+git add homebrew-age-env
+git commit -m "Bump homebrew-age-env submodule"
+echo "Don't forget to push both repos!"
