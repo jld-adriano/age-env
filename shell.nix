@@ -1,6 +1,14 @@
 { pkgs ? import <nixpkgs> { } }:
-pkgs.mkShell {
-  nativeBuildInputs = with pkgs; [ rustc cargo gcc rustfmt clippy age ];
+let frameworks = pkgs.darwin.apple_sdk.frameworks;
+in pkgs.mkShell {
+  nativeBuildInputs = with pkgs; [ rustc cargo rustfmt clippy age nixfmt ];
+
+  buildInputs = [
+    frameworks.Security
+    frameworks.CoreFoundation
+    frameworks.CoreServices
+    pkgs.libiconv
+  ];
 
   # Certain Rust tools won't work without this
   # This can also be fixed by using oxalica/rust-overlay and specifying the rust-src extension
