@@ -7,6 +7,7 @@ name = "age-env"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "clap_complete",
  "dotenv-parser",
  "which",
 ]
@@ -101,6 +102,15 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim",
+]
+
+[[package]]
+name = "clap_complete"
+version = "4.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d598e88f6874d4b888ed40c71efbcbf4076f1dfbae128a08a8c9e45f710605d"
+dependencies = [
+ "clap",
 ]
 
 [[package]]

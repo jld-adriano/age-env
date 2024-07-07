@@ -7,15 +7,19 @@ use dotenv_parser;
 use std::env;
 use std::fs;
 use std::fs::File;
+use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+
+use clap::CommandFactory;
+use clap_complete::{generate, Shell};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     /// Path to env storage directory
-    #[arg(short = 'd', long, default_value_t = String::new())]
+    #[arg(short = 'd', long, default_value_t = format!("{}/.age-env", env::var("HOME").unwrap()))]
     config_dir: String,
     #[command(subcommand)]
     command: Command,
@@ -48,6 +52,11 @@ enum Command {
         #[arg(last = true)]
         command: Vec<String>,
     },
+    Generate {
+        /// The shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
 }
 
 fn main() {
@@ -57,14 +66,10 @@ fn main() {
         panic!("The 'age' command is required but it's not installed or not found in the PATH.");
     }
 
-    let mut dir = args.config_dir;
-    if dir == "" {
-        dir = env::var("HOME").unwrap() + "/.age-env";
-        if !Path::new(&dir).exists() {
-            fs::create_dir(&dir).unwrap();
-        }
+    let dir = Path::new(&args.config_dir);
+    if !dir.exists() {
+        fs::create_dir(&dir).unwrap();
     }
-    let dir = Path::new(&dir);
 
     let envs_dir = dir.join("envs");
     if !envs_dir.exists() {
@@ -267,6 +272,11 @@ fn main() {
         }
         Command::Reset => {
             fs::remove_dir_all(&dir).unwrap();
+        }
+        Command::Generate { shell } => {
+            let mut cmd = Args::command();
+            let bin_name = cmd.get_name().to_string();
+            generate(shell, &mut cmd, bin_name, &mut io::stdout());
         }
     }
 }
