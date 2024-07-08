@@ -43,6 +43,8 @@ enum Command {
         recipient: Option<String>,
         #[arg(short = 'R', long)]
         recipients_file: Option<String>,
+        #[arg(short = 'y', long)]
+        skip_upsert_confirmation: bool,
     },
     /// Show the contents of an environment
     Show {
@@ -162,12 +164,23 @@ fn main() {
             from_env_file,
             recipient,
             recipients_file,
+            skip_upsert_confirmation,
         } => {
             let file_path = envs_dir.join(name.clone());
             let env_file = from_env_file.map(|file| Path::new(&dir).join(file));
 
-            if file_path.exists() {
-                panic!("Environment {:?} already exists", file_path);
+            if file_path.exists() && !skip_upsert_confirmation {
+                println!(
+                    "Environment {:?} already exists. Do you want to overwrite it? (y/n)",
+                    file_path
+                );
+                let mut input = String::new();
+                std::io::stdin()
+                    .read_line(&mut input)
+                    .expect("Failed to read input from stdin");
+                if input.trim().eq_ignore_ascii_case("y") {
+                    panic!("Aborted");
+                }
             }
 
             let mut age_command = std::process::Command::new("age");
