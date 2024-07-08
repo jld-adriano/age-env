@@ -58,4 +58,19 @@ echo "delete"
 run delete test-env-1
 run delete test-env-2
 
+echo "local-config-dir"
+alias run-local-env="AGE_ENV_CONFIG_DIR=./local-config-dir cargo run -q --"
+alias run-local-flag="cargo run -q -- --config-dir=./local-config-dir "
+
+age-keygen > test-key-3.age
+cat test-key-3.age | run-local-env add-identity
+export PUBLIC_KEY_3=$(cat test-key-3.age | grep "public key" | cut -d ":" -f 2 | tr -d " ")
+echo $PUBLIC_KEY_3 | run-local-env add-recipient
+echo "----------------"
+echo "create"
+echo "TEST=localval" | run-local-env create test-env-3
+
+echo "----------------"
+echo "list"
+run-local-flag list | grep test-env-3
 
