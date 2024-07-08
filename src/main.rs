@@ -56,6 +56,12 @@ enum Command {
         /// Name of the environment to show
         name: String,
     },
+    /// Show the contents of an environment prepared for eval
+    #[command(alias = "se")]
+    ShowForEval {
+        /// Name of the environment to show
+        name: String,
+    },
     /// Delete an environment
     #[command(alias = "d")]
     Delete {
@@ -266,6 +272,20 @@ fn main() {
                 "{}",
                 String::from_utf8(contents).expect("Failed to convert bytes to string")
             );
+        }
+        Command::ShowForEval { name } => {
+            let file = envs_dir.join(name.clone());
+            if !file.exists() {
+                panic!("Environment {:?} does not exist", file);
+            }
+            let contents = decrypt_file_contents(file, identities_file, name);
+            let parsed_env = dotenv_parser::parse_dotenv(
+                &String::from_utf8(contents).expect("Failed to convert bytes to string"),
+            )
+            .expect("Failed to parse dotenv contents");
+            for (key, value) in parsed_env.iter() {
+                println!("export {}={}", key, value);
+            }
         }
         Command::Delete { name } => {
             let file = envs_dir.join(name.clone());

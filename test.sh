@@ -50,6 +50,10 @@ echo "TEST=newval" | run create -y test-env-1
 run show test-env-1 | grep newval
 
 echo "----------------"
+echo "show-for-eval"
+run show-for-eval test-env-1 | grep "export TEST=newval"
+
+echo "----------------"
 echo "delete"
 run delete test-env-1
 run delete test-env-2
