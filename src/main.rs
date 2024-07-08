@@ -19,10 +19,16 @@ use clap_complete::{generate, Shell};
 #[command(version, about, long_about = None)]
 struct Args {
     /// Path to env storage directory
-    #[arg(short = 'd', long, default_value_t = format!("{}/.age-env", env::var("HOME").unwrap()))]
+    /// Can be overridden by the AGE_ENV_CONFIG_DIR environment variables
+    #[arg(short = 'd', long, default_value_t = get_config_dir())]
     config_dir: String,
     #[command(subcommand)]
     command: Command,
+}
+
+fn get_config_dir() -> String {
+    env::var("AGE_ENV_CONFIG_DIR")
+        .unwrap_or_else(|_| format!("{}/.age-env", env::var("HOME").unwrap()))
 }
 
 #[derive(Parser, Debug)]
