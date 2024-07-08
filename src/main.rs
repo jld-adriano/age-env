@@ -28,12 +28,16 @@ struct Args {
 #[derive(Parser, Debug)]
 enum Command {
     /// Add a new identity to the global configuration
+    #[command(alias = "ai")]
     AddIdentity,
     /// Add a new recipient to the global configuration
+    #[command(alias = "ar")]
     AddRecipient,
     /// List all environments
+    #[command(alias = "l")]
     List,
     /// Create a new environment
+    #[command(alias = "c")]
     Create {
         /// Name of the environment to create
         name: String,
@@ -47,20 +51,25 @@ enum Command {
         skip_upsert_confirmation: bool,
     },
     /// Show the contents of an environment
+    #[command(alias = "s")]
     Show {
         /// Name of the environment to show
         name: String,
     },
     /// Delete an environment
+    #[command(alias = "d")]
     Delete {
         /// Name of the environment to delete
         name: String,
     },
     /// Delete all environments
+    #[command(alias = "da")]
     DeleteAll,
     /// Reset the installation
+    #[command(alias = "r")]
     Reset,
     /// Run a command with the environment
+    #[command(alias = "rwe")]
     RunWithEnv {
         /// Name of the environment to run with
         name: String,
@@ -68,6 +77,7 @@ enum Command {
         command: Vec<String>,
     },
     /// Generate shell completions
+    #[command(alias = "g")]
     Generate {
         /// The shell to generate completions for
         #[arg(value_enum)]
