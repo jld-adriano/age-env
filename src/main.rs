@@ -44,6 +44,11 @@ enum Command {
         #[arg(short = 'R', long)]
         recipients_file: Option<String>,
     },
+    /// Show the contents of an environment
+    Show {
+        /// Name of the environment to show
+        name: String,
+    },
     /// Delete an environment
     Delete {
         /// Name of the environment to delete
@@ -228,6 +233,17 @@ fn main() {
                 panic!("Failed to create environment {} in {:?}", name, file_path);
             }
         }
+        Command::Show { name } => {
+            let file = envs_dir.join(name.clone());
+            if !file.exists() {
+                panic!("Environment {:?} does not exist", file);
+            }
+            let contents = decrypt_file_contents(file, identities_file, name);
+            println!(
+                "{}",
+                String::from_utf8(contents).expect("Failed to convert bytes to string")
+            );
+        }
         Command::Delete { name } => {
             let file = envs_dir.join(name.clone());
             if file.exists() {
@@ -284,41 +300,7 @@ fn main() {
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
-            let file_contents = fs::read(&file).expect("Failed to read environment file");
-            let mut child = std::process::Command::new("age")
-                .arg("-d")
-                .arg("--identity")
-                .arg(&identities_file)
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::piped())
-                .spawn()
-                .expect("Failed to spawn age command");
-            {
-                let stdin = child
-                    .stdin
-                    .as_mut()
-                    .expect("Failed to open stdin for age command");
-                stdin
-                    .write_all(&file_contents)
-                    .expect("Failed to write environment contents to age command");
-            }
-            let status = child.wait().expect("Failed to wait for age command");
-            if !status.success() {
-                panic!(
-                    "Failed to run command with environment {}: {}: stderr: {:?}",
-                    name,
-                    status,
-                    child
-                        .stderr
-                        .expect("Failed to read stderr from age command")
-                );
-            }
-            let mut contents = Vec::new();
-            child
-                .stdout
-                .expect("Failed to open stdout for age command")
-                .read_to_end(&mut contents)
-                .expect("Failed to read stdout from age command");
+            let contents = decrypt_file_contents(file, identities_file, name);
 
             let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
             let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
@@ -345,4 +327,47 @@ fn main() {
             generate(shell, &mut cmd, bin_name, &mut io::stdout());
         }
     }
+}
+
+fn decrypt_file_contents(
+    file: std::path::PathBuf,
+    identities_file: std::path::PathBuf,
+    name: String,
+) -> Vec<u8> {
+    let file_contents = fs::read(&file).expect("Failed to read environment file");
+    let mut child = std::process::Command::new("age")
+        .arg("-d")
+        .arg("--identity")
+        .arg(&identities_file)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn age command");
+    {
+        let stdin = child
+            .stdin
+            .as_mut()
+            .expect("Failed to open stdin for age command");
+        stdin
+            .write_all(&file_contents)
+            .expect("Failed to write environment contents to age command");
+    }
+    let status = child.wait().expect("Failed to wait for age command");
+    if !status.success() {
+        panic!(
+            "Failed to run command with environment {}: {}: stderr: {:?}",
+            name,
+            status,
+            child
+                .stderr
+                .expect("Failed to read stderr from age command")
+        );
+    }
+    let mut contents = Vec::new();
+    child
+        .stdout
+        .expect("Failed to open stdout for age command")
+        .read_to_end(&mut contents)
+        .expect("Failed to read stdout from age command");
+    contents
 }
