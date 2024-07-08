@@ -41,6 +41,15 @@ echo "run-with-env"
 run run-with-env test-env-2 -- zsh -c 'echo "$TEST"' | grep realval
 
 echo "----------------"
+echo "show"
+run show test-env-1 | grep realval
+
+echo "----------------"
+echo "update"
+echo "TEST=newval" | run create -y test-env-1
+run show test-env-1 | grep newval
+
+echo "----------------"
 echo "delete"
 run delete test-env-1
 run delete test-env-2
