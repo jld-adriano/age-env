@@ -28,8 +28,23 @@ struct Args {
 }
 
 fn get_config_dir() -> String {
-    env::var("AGE_ENV_CONFIG_DIR")
-        .unwrap_or_else(|_| format!("{}/.age-env", env::var("HOME").unwrap()))
+    if let Ok(config_dir) = env::var("AGE_ENV_CONFIG_DIR") {
+        return config_dir;
+    }
+
+    let mut current_dir = env::current_dir().expect("Failed to get current directory");
+    loop {
+        let age_env_path = current_dir.join(".age-env");
+        if age_env_path.exists() {
+            return age_env_path.to_str().unwrap().to_string();
+        }
+
+        if !current_dir.pop() {
+            break;
+        }
+    }
+
+    format!("{}/.age-env", env::var("HOME").unwrap())
 }
 
 #[derive(Parser, Debug)]
