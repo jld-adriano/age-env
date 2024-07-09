@@ -98,6 +98,29 @@ echo "run-with-env with --only"
 run run-with-env --only TEST test-env-5 -- zsh -c 'echo "$TEST"' | grep realval
 run run-with-env --only TEST test-env-5 -- zsh -c 'echo "$OTHER"' | grep -v otherval
 
+echo "----------------"
+echo "create with --exclude"
+echo 'TEST=realval
+OTHER=otherval' | run create --exclude OTHER test-env-6
+run show test-env-6 | grep realval
+run show test-env-6 | grep -v otherval
+
+echo "----------------"
+echo "show with --exclude"
+echo 'TEST=realval
+OTHER=otherval' | run create test-env-7
+run show --exclude OTHER test-env-7 | grep realval
+run show --exclude OTHER test-env-7 | grep -v otherval
+
+echo "----------------"
+echo "show-for-eval with --exclude"
+run show-for-eval --exclude OTHER test-env-7 | grep "export TEST=realval"
+run show-for-eval --exclude OTHER test-env-7 | grep -v "export OTHER=otherval"
+
+echo "----------------"
+echo "run-with-env with --exclude"
+run run-with-env --exclude OTHER test-env-7 -- zsh -c 'echo "$TEST"' | grep realval
+run run-with-env --exclude OTHER test-env-7 -- zsh -c 'echo "$OTHER"' | grep -v otherval
 
 echo "----------------"
 echo "malformed create input should error"
@@ -107,5 +130,3 @@ if echo "TEST" | run create malformed-env 2>/dev/null; then
 else
     echo "Malformed input caused an error as expected"
 fi
-
-

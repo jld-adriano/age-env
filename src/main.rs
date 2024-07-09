@@ -58,6 +58,8 @@ enum Command {
         skip_upsert_confirmation: bool,
         #[arg(long)]
         only: Option<Vec<String>>,
+        #[arg(long)]
+        exclude: Option<Vec<String>>,
     },
     /// Show the contents of an environment
     #[command(alias = "s")]
@@ -66,6 +68,8 @@ enum Command {
         name: String,
         #[arg(long)]
         only: Option<Vec<String>>,
+        #[arg(long)]
+        exclude: Option<Vec<String>>,
     },
     /// Show the contents of an environment prepared for eval
     #[command(alias = "se")]
@@ -74,6 +78,8 @@ enum Command {
         name: String,
         #[arg(long)]
         only: Option<Vec<String>>,
+        #[arg(long)]
+        exclude: Option<Vec<String>>,
     },
     /// Delete an environment
     #[command(alias = "d")]
@@ -96,6 +102,8 @@ enum Command {
         command: Vec<String>,
         #[arg(short = 'o', long)]
         only: Option<Vec<String>>,
+        #[arg(long)]
+        exclude: Option<Vec<String>>,
     },
     /// Generate shell completions
     #[command(alias = "g")]
@@ -197,6 +205,7 @@ fn main() {
             recipients_file,
             skip_upsert_confirmation,
             only,
+            exclude,
         } => {
             let file_path = envs_dir.join(name.clone());
             let env_file = from_env_file.map(|file| Path::new(&dir).join(file));
@@ -256,11 +265,7 @@ fn main() {
             let parsed_env = dotenv_parser::parse_dotenv(&env_contents)
                 .expect("Failed to parse dotenv contents");
 
-            let filtered_env_contents = if let Some(only_keys) = only {
-                filter_env_contents(parsed_env, only_keys)
-            } else {
-                parsed_env
-            };
+            let filtered_env_contents = apply_only_exclude(parsed_env, only, exclude);
             let filtered_env_contents_string = filtered_env_contents
                 .iter()
                 .map(|(key, value)| format!("{}={}", key, value))
@@ -287,7 +292,11 @@ fn main() {
                 panic!("Failed to create environment {} in {:?}", name, file_path);
             }
         }
-        Command::Show { name, only } => {
+        Command::Show {
+            name,
+            only,
+            exclude,
+        } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
@@ -297,16 +306,16 @@ fn main() {
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
             .expect("Failed to parse dotenv contents");
-            let filtered_env_contents = if let Some(only_keys) = only {
-                filter_env_contents(parsed_env, only_keys)
-            } else {
-                parsed_env
-            };
+            let filtered_env_contents = apply_only_exclude(parsed_env, only, exclude);
             for (key, value) in filtered_env_contents.iter() {
                 println!("{}={}", key, value);
             }
         }
-        Command::ShowForEval { name, only } => {
+        Command::ShowForEval {
+            name,
+            only,
+            exclude,
+        } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
@@ -316,11 +325,7 @@ fn main() {
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
             .expect("Failed to parse dotenv contents");
-            let filtered_env_contents = if let Some(only_keys) = only {
-                filter_env_contents(parsed_env, only_keys)
-            } else {
-                parsed_env
-            };
+            let filtered_env_contents = apply_only_exclude(parsed_env, only, exclude);
             for (key, value) in filtered_env_contents.iter() {
                 println!("export {}={}", key, value);
             }
@@ -380,6 +385,7 @@ fn main() {
             name,
             command,
             only,
+            exclude,
         } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
@@ -390,11 +396,7 @@ fn main() {
             let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
             let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
 
-            let filtered_env = if let Some(only_keys) = only {
-                filter_env_contents(parsed_env, only_keys)
-            } else {
-                parsed_env
-            };
+            let filtered_env = apply_only_exclude(parsed_env, only, exclude);
 
             let mut command_process = std::process::Command::new(command[0].clone());
 
@@ -420,6 +422,33 @@ fn main() {
     }
 }
 
+fn apply_only_exclude(
+    parsed_env: BTreeMap<String, String>,
+    only: Option<Vec<String>>,
+    exclude: Option<Vec<String>>,
+) -> BTreeMap<String, String> {
+    let filtered_env_contents = if let Some(only_keys) = only {
+        filter_env_contents(parsed_env, only_keys)
+    } else {
+        parsed_env
+    };
+    let filtered_env_contents = if let Some(exclude_keys) = exclude {
+        exclude_env_contents(filtered_env_contents, exclude_keys)
+    } else {
+        filtered_env_contents
+    };
+    filtered_env_contents
+}
+
+fn exclude_env_contents(
+    env_contents: BTreeMap<String, String>,
+    exclude_keys: Vec<String>,
+) -> BTreeMap<String, String> {
+    env_contents
+        .into_iter()
+        .filter(|(key, _)| !exclude_keys.contains(key))
+        .collect::<BTreeMap<String, String>>()
+}
 fn filter_env_contents(
     env_contents: BTreeMap<String, String>,
     only_keys: Vec<String>,
