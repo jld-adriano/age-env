@@ -63,7 +63,7 @@ enum Command {
     Create {
         /// Name of the environment to create
         name: String,
-        #[arg(short = 'e', long)]
+        #[arg(short = 'f', long)]
         from_env_file: Option<String>,
         #[arg(short = 'r', long)]
         recipient: Option<String>,
@@ -71,9 +71,9 @@ enum Command {
         recipients_file: Option<String>,
         #[arg(short = 'y', long)]
         skip_upsert_confirmation: bool,
-        #[arg(long)]
+        #[arg(short = 'o', long)]
         only: Option<Vec<String>>,
-        #[arg(long)]
+        #[arg(short = 'e', long)]
         exclude: Option<Vec<String>>,
     },
     /// Show the contents of an environment
@@ -81,9 +81,9 @@ enum Command {
     Show {
         /// Name of the environment to show
         name: String,
-        #[arg(long)]
+        #[arg(short = 'o', long)]
         only: Option<Vec<String>>,
-        #[arg(long)]
+        #[arg(short = 'e', long)]
         exclude: Option<Vec<String>>,
         #[arg(short = 'v', long)]
         value: Option<String>,
@@ -93,9 +93,9 @@ enum Command {
     ShowForEval {
         /// Name of the environment to show
         name: String,
-        #[arg(long)]
+        #[arg(short = 'o', long)]
         only: Option<Vec<String>>,
-        #[arg(long)]
+        #[arg(short = 'e', long)]
         exclude: Option<Vec<String>>,
     },
     /// Delete an environment
@@ -119,7 +119,7 @@ enum Command {
         command: Vec<String>,
         #[arg(short = 'o', long)]
         only: Option<Vec<String>>,
-        #[arg(long)]
+        #[arg(short = 'e', long)]
         exclude: Option<Vec<String>>,
     },
     /// Generate shell completions
