@@ -74,3 +74,27 @@ echo "----------------"
 echo "list"
 run-local-flag list | grep test-env-3
 
+echo "----------------"
+echo "create with --only"
+echo 'TEST=realval
+OTHER=otherval' | run create --only TEST test-env-4
+run show test-env-4 | grep realval
+run show test-env-4 | grep -v otherval
+
+echo "----------------"
+echo "show with --only"
+echo 'TEST=realval
+OTHER=otherval' | run create test-env-5
+run show --only TEST test-env-5 | grep realval
+run show --only TEST test-env-5 | grep -v otherval
+
+echo "----------------"
+echo "show-for-eval with --only"
+run show-for-eval --only TEST test-env-5 | grep "export TEST=realval"
+run show-for-eval --only TEST test-env-5 | grep -v "export OTHER=otherval"
+
+echo "----------------"
+echo "run-with-env with --only"
+run run-with-env --only TEST test-env-5 -- zsh -c 'echo "$TEST"' | grep realval
+run run-with-env --only TEST test-env-5 -- zsh -c 'echo "$OTHER"' | grep -v otherval
+

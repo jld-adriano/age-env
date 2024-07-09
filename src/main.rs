@@ -4,6 +4,7 @@
 **/
 use clap::Parser;
 use dotenv_parser;
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -55,18 +56,24 @@ enum Command {
         recipients_file: Option<String>,
         #[arg(short = 'y', long)]
         skip_upsert_confirmation: bool,
+        #[arg(long)]
+        only: Option<Vec<String>>,
     },
     /// Show the contents of an environment
     #[command(alias = "s")]
     Show {
         /// Name of the environment to show
         name: String,
+        #[arg(long)]
+        only: Option<Vec<String>>,
     },
     /// Show the contents of an environment prepared for eval
     #[command(alias = "se")]
     ShowForEval {
         /// Name of the environment to show
         name: String,
+        #[arg(long)]
+        only: Option<Vec<String>>,
     },
     /// Delete an environment
     #[command(alias = "d")]
@@ -87,6 +94,8 @@ enum Command {
         name: String,
         #[arg(last = true)]
         command: Vec<String>,
+        #[arg(short = 'o', long)]
+        only: Option<Vec<String>>,
     },
     /// Generate shell completions
     #[command(alias = "g")]
@@ -187,6 +196,7 @@ fn main() {
             recipient,
             recipients_file,
             skip_upsert_confirmation,
+            only,
         } => {
             let file_path = envs_dir.join(name.clone());
             let env_file = from_env_file.map(|file| Path::new(&dir).join(file));
@@ -243,10 +253,19 @@ fn main() {
                     stdin
                 }
             };
+            let parsed_env = dotenv_parser::parse_dotenv(&env_contents)
+                .expect("Failed to parse dotenv contents");
 
-            let mut file = File::create(&file_path).expect("Failed to create environment file");
-            file.write_all(env_contents.as_bytes())
-                .expect("Failed to write environment contents to file");
+            let filtered_env_contents = if let Some(only_keys) = only {
+                filter_env_contents(parsed_env, only_keys)
+            } else {
+                parsed_env
+            };
+            let filtered_env_contents_string = filtered_env_contents
+                .iter()
+                .map(|(key, value)| format!("{}={}", key, value))
+                .collect::<Vec<String>>()
+                .join("\n");
 
             let mut child = age_command
                 .stdin(std::process::Stdio::piped())
@@ -258,7 +277,7 @@ fn main() {
                     .as_mut()
                     .expect("Failed to open stdin for age command");
                 stdin
-                    .write_all(env_contents.as_bytes())
+                    .write_all(filtered_env_contents_string.as_bytes())
                     .expect("Failed to write environment contents to age command");
             }
             let status = child.wait().expect("Failed to wait for age command");
@@ -268,18 +287,7 @@ fn main() {
                 panic!("Failed to create environment {} in {:?}", name, file_path);
             }
         }
-        Command::Show { name } => {
-            let file = envs_dir.join(name.clone());
-            if !file.exists() {
-                panic!("Environment {:?} does not exist", file);
-            }
-            let contents = decrypt_file_contents(file, identities_file, name);
-            println!(
-                "{}",
-                String::from_utf8(contents).expect("Failed to convert bytes to string")
-            );
-        }
-        Command::ShowForEval { name } => {
+        Command::Show { name, only } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
@@ -289,7 +297,31 @@ fn main() {
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
             .expect("Failed to parse dotenv contents");
-            for (key, value) in parsed_env.iter() {
+            let filtered_env_contents = if let Some(only_keys) = only {
+                filter_env_contents(parsed_env, only_keys)
+            } else {
+                parsed_env
+            };
+            for (key, value) in filtered_env_contents.iter() {
+                println!("{}={}", key, value);
+            }
+        }
+        Command::ShowForEval { name, only } => {
+            let file = envs_dir.join(name.clone());
+            if !file.exists() {
+                panic!("Environment {:?} does not exist", file);
+            }
+            let contents = decrypt_file_contents(file, identities_file, name);
+            let parsed_env = dotenv_parser::parse_dotenv(
+                &String::from_utf8(contents).expect("Failed to convert bytes to string"),
+            )
+            .expect("Failed to parse dotenv contents");
+            let filtered_env_contents = if let Some(only_keys) = only {
+                filter_env_contents(parsed_env, only_keys)
+            } else {
+                parsed_env
+            };
+            for (key, value) in filtered_env_contents.iter() {
                 println!("export {}={}", key, value);
             }
         }
@@ -344,7 +376,11 @@ fn main() {
             }
             println!("Deleted all environments in {:?}", dir);
         }
-        Command::RunWithEnv { name, command } => {
+        Command::RunWithEnv {
+            name,
+            command,
+            only,
+        } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
@@ -354,9 +390,15 @@ fn main() {
             let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
             let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
 
+            let filtered_env = if let Some(only_keys) = only {
+                filter_env_contents(parsed_env, only_keys)
+            } else {
+                parsed_env
+            };
+
             let mut command_process = std::process::Command::new(command[0].clone());
 
-            for (key, value) in parsed_env.iter() {
+            for (key, value) in filtered_env.iter() {
                 command_process.env(key, value);
             }
             command_process.args(&command[1..]);
@@ -376,6 +418,16 @@ fn main() {
             generate(shell, &mut cmd, bin_name, &mut io::stdout());
         }
     }
+}
+
+fn filter_env_contents(
+    env_contents: BTreeMap<String, String>,
+    only_keys: Vec<String>,
+) -> BTreeMap<String, String> {
+    env_contents
+        .into_iter()
+        .filter(|(key, _)| only_keys.contains(key))
+        .collect::<BTreeMap<String, String>>()
 }
 
 fn decrypt_file_contents(
