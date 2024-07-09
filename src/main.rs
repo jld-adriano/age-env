@@ -85,6 +85,8 @@ enum Command {
         only: Option<Vec<String>>,
         #[arg(long)]
         exclude: Option<Vec<String>>,
+        #[arg(short = 'v', long)]
+        value: Option<String>,
     },
     /// Show the contents of an environment prepared for eval
     #[command(alias = "se")]
@@ -311,6 +313,7 @@ fn main() {
             name,
             only,
             exclude,
+            value,
         } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
@@ -322,8 +325,16 @@ fn main() {
             )
             .expect("Failed to parse dotenv contents");
             let filtered_env_contents = apply_only_exclude(parsed_env, only, exclude);
-            for (key, value) in filtered_env_contents.iter() {
-                println!("{}={}", key, value);
+            if let Some(key) = value {
+                if let Some(val) = filtered_env_contents.get(&key) {
+                    println!("{}", val);
+                } else {
+                    panic!("Key {} not found", key);
+                }
+            } else {
+                for (key, value) in filtered_env_contents.iter() {
+                    println!("{}={}", key, value);
+                }
             }
         }
         Command::ShowForEval {

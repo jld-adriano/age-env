@@ -130,3 +130,17 @@ if echo "TEST" | run create malformed-env 2>/dev/null; then
 else
     echo "Malformed input caused an error as expected"
 fi
+
+echo "----------------"
+echo "show with --value"
+echo 'TEST=realval
+OTHER=otherval' | run create test-env-8
+run show --value TEST test-env-8 | grep realval | grep -v otherval
+run show --value OTHER test-env-8 | grep otherval | grep -v realval
+
+if run show --value NONEXISTENT test-env-8 >/dev/null 2>&1; then
+    echo "Error: Key NONEXISTENT did not cause an error"
+    exit 1
+else
+    echo "Key NONEXISTENT not found as expected"
+fi
