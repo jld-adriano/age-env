@@ -21,11 +21,11 @@ export PUBLIC_KEY_2=$(cat test-key-2.age | grep "public key" | cut -d ":" -f 2 |
 
 echo "----------------"
 echo "create"
-echo "TEST=realval" | run create  test-env-1
+echo "TEST=realval" | run create test-env-1
 
 echo "----------------"
 echo "create"
-echo "TEST=realval" | run create  test-env-2
+echo "TEST=realval" | run create test-env-2
 
 echo "----------------"
 echo "list"
@@ -97,4 +97,15 @@ echo "----------------"
 echo "run-with-env with --only"
 run run-with-env --only TEST test-env-5 -- zsh -c 'echo "$TEST"' | grep realval
 run run-with-env --only TEST test-env-5 -- zsh -c 'echo "$OTHER"' | grep -v otherval
+
+
+echo "----------------"
+echo "malformed create input should error"
+if echo "TEST" | run create malformed-env 2>/dev/null; then
+    echo "Error: Malformed input did not cause an error" >&2
+    exit 1
+else
+    echo "Malformed input caused an error as expected"
+fi
+
 
