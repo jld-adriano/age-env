@@ -61,3 +61,6 @@ age-env run-with-env github-token -- gh repo list
 - Publish proper brew pkg
 - Add nixpkg as well
 - Nested folder environments
+
+# Known errors
+- create -y on piped command error still overrides
