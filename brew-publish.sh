@@ -2,6 +2,8 @@
 
 set -eo pipefail
 
+./test.sh
+
 # Bump Cargo.toml version
 if git diff --quiet Cargo.toml; then
     current_version=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
