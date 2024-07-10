@@ -33,6 +33,10 @@ run list | grep test-env-1
 run list | grep test-env-2
 
 echo "----------------"
+echo "list-keys"
+run list-keys test-env-2 | grep -v realval | grep TEST
+
+echo "----------------"
 echo "run-with-env"
 run run-with-env test-env-1 -- zsh -c 'echo "$TEST"' | grep realval
 
@@ -74,6 +78,7 @@ echo "----------------"
 echo "list"
 run-local-flag list | grep test-env-3
 run-local-flag list --short | grep test-env-3
+
 
 echo "----------------"
 echo "create with --only"

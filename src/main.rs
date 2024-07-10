@@ -58,8 +58,13 @@ enum Command {
     /// List all environments
     #[command(alias = "l")]
     List {
+        /// If active, only show names of environments
         #[arg(short = 's', long)]
         short: bool,
+    },
+    ListKeys {
+        /// Name of the environment to list keys for
+        name: String,
     },
     /// Create a new environment
     #[command(alias = "c")]
@@ -219,6 +224,17 @@ fn main() {
                     file = file.split("/").last().unwrap().to_string();
                 }
                 println!("{}", file);
+            }
+        }
+        Command::ListKeys { name } => {
+            let file = envs_dir.join(name.clone());
+            let contents = decrypt_file_contents(file, identities_file, name);
+            let contents_str =
+                String::from_utf8(contents).expect("Failed to convert contents to string");
+            let parsed_env = dotenv_parser::parse_dotenv(&contents_str)
+                .expect("Failed to parse dotenv contents");
+            for key in parsed_env.keys() {
+                println!("{}", key);
             }
         }
         Command::Create {
