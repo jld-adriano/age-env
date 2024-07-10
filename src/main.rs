@@ -21,22 +21,26 @@ use clap_complete::{generate, Shell};
 struct Args {
     /// Path to env storage directory
     /// Can be overridden by the AGE_ENV_CONFIG_DIR environment variables
-    #[arg(short = 'd', long, default_value_t = get_config_dir())]
+    #[arg(short = 'd', long, default_value_t = get_config_dir_path().to_str().unwrap().to_string())]
     config_dir: String,
+    #[arg(long, default_value_t = get_config_dir_path().join("identities").to_str().unwrap().to_string())]
+    global_identities_file: String,
+    #[arg(long, default_value_t = get_config_dir_path().join("recipients").to_str().unwrap().to_string())]
+    global_recipients_file: String,
     #[command(subcommand)]
     command: Command,
 }
 
-fn get_config_dir() -> String {
+fn get_config_dir_path() -> PathBuf {
     if let Ok(config_dir) = env::var("AGE_ENV_CONFIG_DIR") {
-        return config_dir;
+        return PathBuf::from(config_dir);
     }
 
     let mut current_dir = env::current_dir().expect("Failed to get current directory");
     loop {
         let age_env_path = current_dir.join(".age-env");
         if age_env_path.exists() {
-            return age_env_path.to_str().unwrap().to_string();
+            return age_env_path;
         }
 
         if !current_dir.pop() {
@@ -44,7 +48,7 @@ fn get_config_dir() -> String {
         }
     }
 
-    format!("{}/.age-env", env::var("HOME").unwrap())
+    PathBuf::from(format!("{}/.age-env", env::var("HOME").unwrap()))
 }
 
 #[derive(Parser, Debug)]
@@ -163,7 +167,7 @@ fn main() {
         .into_iter()
         .any(|command| matches!(&args.command, command));
 
-    let identities_file = dir.join("identities");
+    let identities_file = PathBuf::from(args.global_identities_file);
     if !identities_file.exists() && !is_pre_init_command {
         panic!(
             "Identities file {:?} does not exist. Run `age-env add-identity` to create it.",
@@ -171,7 +175,7 @@ fn main() {
         );
     }
 
-    let global_recipients_file = dir.join("recipients");
+    let global_recipients_file = PathBuf::from(args.global_recipients_file);
     let global_recipients_file_exists = global_recipients_file.exists();
 
     match args.command {
