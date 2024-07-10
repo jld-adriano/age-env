@@ -57,7 +57,10 @@ enum Command {
     AddRecipient,
     /// List all environments
     #[command(alias = "l")]
-    List,
+    List {
+        #[arg(short = 's', long)]
+        short: bool,
+    },
     /// Create a new environment
     #[command(alias = "c")]
     Create {
@@ -203,16 +206,19 @@ fn main() {
                 .write_all(recipients.as_bytes())
                 .expect("Failed to write recipients to file");
         }
-        Command::List => {
+        Command::List { short } => {
             let files = fs::read_dir(&envs_dir).expect("Failed to read envs directory");
             for file in files {
-                println!(
-                    "{}",
-                    file.expect("Failed to read file in envs directory")
-                        .path()
-                        .to_str()
-                        .expect("Failed to convert path to string")
-                );
+                let mut file = file
+                    .expect("Failed to read file in envs directory")
+                    .path()
+                    .to_str()
+                    .expect("Failed to convert path to string")
+                    .to_string();
+                if short {
+                    file = file.split("/").last().unwrap().to_string();
+                }
+                println!("{}", file);
             }
         }
         Command::Create {

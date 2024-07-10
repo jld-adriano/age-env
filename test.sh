@@ -73,6 +73,7 @@ echo "TEST=localval" | run-local-env create test-env-3
 echo "----------------"
 echo "list"
 run-local-flag list | grep test-env-3
+run-local-flag list --short | grep test-env-3
 
 echo "----------------"
 echo "create with --only"
