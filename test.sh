@@ -28,6 +28,15 @@ echo "create"
 echo "TEST=realval" | run create test-env-2
 
 echo "----------------"
+echo "reencrypt"
+run reencrypt test-env-1
+
+echo "----------------"
+echo "reencrypt-all"
+run reencrypt-all
+
+
+echo "----------------"
 echo "list"
 run list | grep test-env-1
 run list | grep test-env-2
@@ -134,7 +143,7 @@ if echo "TEST" | run create malformed-env 2>/dev/null; then
     echo "Error: Malformed input did not cause an error" >&2
     exit 1
 else
-    echo "Malformed input caused an error as expected"
+    echo "Malformed input caused an error. This is as expected"
 fi
 
 echo "----------------"
@@ -148,5 +157,5 @@ if run show --value NONEXISTENT test-env-8 >/dev/null 2>&1; then
     echo "Error: Key NONEXISTENT did not cause an error"
     exit 1
 else
-    echo "Key NONEXISTENT not found as expected"
+    echo "Key NONEXISTENT not found. This is as expected"
 fi

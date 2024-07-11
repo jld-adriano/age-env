@@ -11,7 +11,8 @@ use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::ExitStatus;
 
 use clap::CommandFactory;
 use clap_complete::{generate, Shell};
@@ -122,6 +123,24 @@ enum Command {
     /// Reset the installation
     #[command(alias = "r")]
     Reset,
+    /// Reencrypt an environment with a new set of recipients
+    #[command(alias = "re")]
+    Reencrypt {
+        /// Name of the environment to reencrypt
+        name: String,
+        #[arg(short = 'r', long)]
+        recipient: Option<String>,
+        #[arg(short = 'R', long)]
+        recipients_file: Option<String>,
+    },
+    /// Reencrypt all environments with a new set of recipients
+    #[command(alias = "rea")]
+    ReencryptAll {
+        #[arg(short = 'r', long)]
+        recipient: Option<String>,
+        #[arg(short = 'R', long)]
+        recipients_file: Option<String>,
+    },
     /// Run a command with the environment
     #[command(alias = "rwe")]
     RunWithEnv {
@@ -175,8 +194,12 @@ fn main() {
         );
     }
 
-    let global_recipients_file = PathBuf::from(args.global_recipients_file);
-    let global_recipients_file_exists = global_recipients_file.exists();
+    let global_recipients_file_path = dir.join("recipients");
+    let global_recipients_file_exists = global_recipients_file_path.exists();
+    let global_recipients_file = match global_recipients_file_exists {
+        true => Some(global_recipients_file_path.clone()),
+        false => None,
+    };
 
     match args.command {
         Command::AddIdentity => {
@@ -197,14 +220,13 @@ fn main() {
                 .expect("Failed to write identities to file");
         }
         Command::AddRecipient => {
-            let mut recipients_file = match global_recipients_file.exists() {
+            let mut recipients_file = match global_recipients_file_path.exists() {
                 true => File::options()
                     .append(true)
-                    .open(&global_recipients_file)
+                    .open(&global_recipients_file_path)
                     .expect("Failed to open recipients file for appending"),
-                false => {
-                    File::create(&global_recipients_file).expect("Failed to create recipients file")
-                }
+                false => File::create(&global_recipients_file_path)
+                    .expect("Failed to create recipients file"),
             };
 
             let mut recipients = String::new();
@@ -232,7 +254,7 @@ fn main() {
         }
         Command::ListKeys { name } => {
             let file = envs_dir.join(name.clone());
-            let contents = decrypt_file_contents(file, identities_file, name);
+            let contents = decrypt_file_contents(&file, &identities_file);
             let contents_str =
                 String::from_utf8(contents).expect("Failed to convert contents to string");
             let parsed_env = dotenv_parser::parse_dotenv(&contents_str)
@@ -267,26 +289,12 @@ fn main() {
                 }
             }
 
-            let mut age_command = std::process::Command::new("age");
-
             if !global_recipients_file_exists && !recipient.is_some() && !recipients_file.is_some()
             {
                 panic!(
                     "Either --recipient or --recipients-file must be provided, or the global recipients file must be present"
                 );
             }
-
-            if let Some(recipient) = recipient {
-                age_command.arg("-r").arg(&recipient);
-            }
-            if let Some(recipients_file) = recipients_file {
-                age_command.arg("-R").arg(&recipients_file);
-            }
-            if global_recipients_file_exists {
-                age_command.arg("-R").arg(&global_recipients_file);
-            }
-
-            age_command.arg("-o").arg(&file_path);
 
             // Read the environment contents from either mode
             let env_contents = match env_file {
@@ -315,20 +323,13 @@ fn main() {
                 .collect::<Vec<String>>()
                 .join("\n");
 
-            let mut child = age_command
-                .stdin(std::process::Stdio::piped())
-                .spawn()
-                .expect("Failed to spawn age command");
-            {
-                let stdin = child
-                    .stdin
-                    .as_mut()
-                    .expect("Failed to open stdin for age command");
-                stdin
-                    .write_all(filtered_env_contents_string.as_bytes())
-                    .expect("Failed to write environment contents to age command");
-            }
-            let status = child.wait().expect("Failed to wait for age command");
+            let status = encrypt_contents_into_file(
+                &recipient,
+                &recipients_file,
+                &global_recipients_file,
+                &file_path,
+                filtered_env_contents_string,
+            );
             if status.success() {
                 println!("Created environment {} in {:?}", name, file_path);
             } else {
@@ -345,7 +346,7 @@ fn main() {
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
-            let contents = decrypt_file_contents(file, identities_file, name);
+            let contents = decrypt_file_contents(&file, &identities_file);
             let parsed_env = dotenv_parser::parse_dotenv(
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
@@ -372,7 +373,7 @@ fn main() {
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
-            let contents = decrypt_file_contents(file, identities_file, name);
+            let contents = decrypt_file_contents(&file, &identities_file);
             let parsed_env = dotenv_parser::parse_dotenv(
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
@@ -443,7 +444,7 @@ fn main() {
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
-            let contents = decrypt_file_contents(file, identities_file, name);
+            let contents = decrypt_file_contents(&file, &identities_file);
 
             let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
             let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
@@ -466,12 +467,66 @@ fn main() {
         Command::Reset => {
             fs::remove_dir_all(&dir).expect("Failed to remove config directory");
         }
+        Command::Reencrypt {
+            name,
+            recipient,
+            recipients_file,
+        } => {
+            let path = envs_dir.join(name.clone());
+            reencrypt(
+                path,
+                &recipient,
+                &recipients_file,
+                &identities_file,
+                &global_recipients_file,
+            );
+        }
+        Command::ReencryptAll {
+            recipient,
+            recipients_file,
+        } => {
+            for file in fs::read_dir(&envs_dir).expect("Failed to read envs directory") {
+                let file = file.expect("Failed to read file in envs directory");
+                let path = file.path();
+                let name = path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .expect("Failed to convert path to string");
+                let path = envs_dir.join(name);
+                reencrypt(
+                    path,
+                    &recipient,
+                    &recipients_file,
+                    &identities_file,
+                    &global_recipients_file,
+                );
+            }
+        }
         Command::Generate { shell } => {
             let mut cmd = Args::command();
             let bin_name = cmd.get_name().to_string();
             generate(shell, &mut cmd, bin_name, &mut io::stdout());
         }
     }
+}
+
+fn reencrypt(
+    path: PathBuf,
+    recipient: &Option<String>,
+    recipients_file: &Option<String>,
+    identities_file: &PathBuf,
+    global_recipients_file: &Option<PathBuf>,
+) -> ExitStatus {
+    let previous_contents = decrypt_file_contents(&path, identities_file);
+    let status = encrypt_contents_into_file(
+        recipient,
+        recipients_file,
+        global_recipients_file,
+        &path,
+        String::from_utf8(previous_contents).unwrap(),
+    );
+    status
 }
 
 fn apply_only_exclude(
@@ -512,9 +567,8 @@ fn filter_env_contents(
 }
 
 fn decrypt_file_contents(
-    file: std::path::PathBuf,
-    identities_file: std::path::PathBuf,
-    name: String,
+    file: &std::path::PathBuf,
+    identities_file: &std::path::PathBuf,
 ) -> Vec<u8> {
     let file_contents = fs::read(&file).expect("Failed to read environment file");
     let mut child = std::process::Command::new("age")
@@ -537,8 +591,7 @@ fn decrypt_file_contents(
     let status = child.wait().expect("Failed to wait for age command");
     if !status.success() {
         panic!(
-            "Failed to run command with environment {}: {}: stderr: {:?}",
-            name,
+            "Failed to run command with status {}: stderr: {:?}",
             status,
             child
                 .stderr
@@ -552,4 +605,42 @@ fn decrypt_file_contents(
         .read_to_end(&mut contents)
         .expect("Failed to read stdout from age command");
     contents
+}
+
+fn encrypt_contents_into_file(
+    recipient: &Option<String>,
+    recipients_file: &Option<String>,
+    global_recipients_file: &Option<PathBuf>,
+    file_path: &PathBuf,
+    filtered_env_contents_string: String,
+) -> std::process::ExitStatus {
+    let mut age_command = std::process::Command::new("age");
+
+    if let Some(recipient) = recipient {
+        age_command.arg("-r").arg(&recipient);
+    }
+    if let Some(recipients_file) = recipients_file {
+        age_command.arg("-R").arg(&recipients_file);
+    }
+    if let Some(global_recipients_file) = global_recipients_file {
+        age_command.arg("-R").arg(&global_recipients_file);
+    }
+
+    age_command.arg("-o").arg(file_path);
+
+    let mut child = age_command
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn age command");
+    {
+        let stdin = child
+            .stdin
+            .as_mut()
+            .expect("Failed to open stdin for age command");
+        stdin
+            .write_all(filtered_env_contents_string.as_bytes())
+            .expect("Failed to write environment contents to age command");
+    }
+    let status = child.wait().expect("Failed to wait for age command");
+    status
 }
