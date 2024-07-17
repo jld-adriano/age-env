@@ -1,3 +1,3 @@
 [submodule "homebrew-age-env"]
 	path = homebrew-age-env
-	url = ./homebrew-age-env
+	url = git@github.com:jld-adriano/homebrew-age-env.git
