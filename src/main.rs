@@ -462,7 +462,8 @@ fn main() {
                 "Failed to spawn command process: `{}`",
                 command[0]
             ));
-            child.wait().expect("Failed to wait for command process");
+            let status = child.wait().expect("Failed to wait for command process");
+            std::process::exit(status.code().unwrap_or(1));
         }
         Command::Reset => {
             fs::remove_dir_all(&dir).expect("Failed to remove config directory");
