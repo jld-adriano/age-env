@@ -22,11 +22,11 @@ use clap_complete::{generate, Shell};
 struct Args {
     /// Path to env storage directory
     /// Can be overridden by the AGE_ENV_CONFIG_DIR environment variables
-    #[arg(short = 'd', long, default_value_t = get_config_dir_path().to_str().unwrap().to_string())]
+    #[arg(short = 'd', long, env = "AGE_ENV_CONFIG_DIR", default_value_t = get_config_dir_path().to_str().unwrap().to_string())]
     config_dir: String,
-    #[arg(long, default_value_t = get_config_dir_path().join("identities").to_str().unwrap().to_string())]
+    #[arg(long, env = "AGE_ENV_IDENTITIES_FILE", default_value_t = get_config_dir_path().join("identities").to_str().unwrap().to_string())]
     global_identities_file: String,
-    #[arg(long, default_value_t = get_config_dir_path().join("recipients").to_str().unwrap().to_string())]
+    #[arg(long, env = "AGE_ENV_RECIPIENTS_FILE", default_value_t = get_config_dir_path().join("recipients").to_str().unwrap().to_string())]
     global_recipients_file: String,
     #[command(subcommand)]
     command: Command,

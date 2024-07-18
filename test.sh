@@ -88,6 +88,16 @@ echo "list"
 run-local-flag list | grep test-env-3
 run-local-flag list --short | grep test-env-3
 
+echo "----------------"
+echo "delete"
+run-local-flag delete test-env-3
+
+echo "----------------"
+echo "global files"
+echo $PUBLIC_KEY_3 | run-local-env add-recipient
+echo "TEST=globalval" | run-local-env create test-env-4
+AGE_ENV_RECIPIENTS_FILE=./local-config-dir/recipients AGE_ENV_IDENTITIES_FILE=./local-config-dir/identities run-local-env show test-env-4 | grep globalval
+
 
 echo "----------------"
 echo "create with --only"
