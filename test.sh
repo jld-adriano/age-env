@@ -171,3 +171,14 @@ if run show --value NONEXISTENT test-env-8 >/dev/null 2>&1; then
 else
     echo "Key NONEXISTENT not found. This is as expected"
 fi
+
+echo "----------------"
+echo "passthrough"
+echo "TEST=realval
+NEW=newval" | run create  test-env-9
+TEST=otherval run show --passthrough -o TEST test-env-9 | grep 'TEST=otherval'
+TEST=otherval run show --passthrough -v TEST test-env-9 | grep 'otherval' | grep -v newval
+TEST=otherval run show-for-eval --passthrough -o TEST test-env-9 | grep 'export TEST=otherval'
+# How to test this one
+# TEST=otherval run show-for-eval --passthrough -o TEST -o NEW test-env-9 | grep 'export TEST=otherval' | grep 'export NEW=newval'
+TEST=otherval run run-with-env test-env-9 -- cargo run -q -- --config-dir=. show --passthrough test-env-9

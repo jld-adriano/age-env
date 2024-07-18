@@ -17,6 +17,8 @@ use std::process::ExitStatus;
 use clap::CommandFactory;
 use clap_complete::{generate, Shell};
 
+const PASSTHROUGH_ENV_PREFIX: &str = "__passthrough_age_env_";
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -100,6 +102,9 @@ enum Command {
         exclude: Option<Vec<String>>,
         #[arg(short = 'v', long)]
         value: Option<String>,
+        /// If environment is already decrypted, pass it through to the command without decrypting it again
+        #[arg(short = 'p', long)]
+        passthrough: bool,
     },
     /// Show the contents of an environment prepared for eval
     #[command(alias = "se")]
@@ -110,6 +115,9 @@ enum Command {
         only: Option<Vec<String>>,
         #[arg(short = 'e', long)]
         exclude: Option<Vec<String>>,
+        /// If environment is already decrypted, pass it through to the command without decrypting it again
+        #[arg(short = 'p', long)]
+        passthrough: bool,
     },
     /// Delete an environment
     #[command(alias = "d")]
@@ -152,6 +160,9 @@ enum Command {
         only: Option<Vec<String>>,
         #[arg(short = 'e', long)]
         exclude: Option<Vec<String>>,
+        /// If environment is already decrypted, pass it through to the command without decrypting it again
+        #[arg(short = 'p', long)]
+        passthrough: bool,
     },
     /// Generate shell completions
     #[command(alias = "g")]
@@ -347,18 +358,45 @@ fn main() {
             only,
             exclude,
             value,
+            passthrough,
         } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
             let contents = decrypt_file_contents(&file, &identities_file);
+            if passthrough {
+                let passthrough_key =
+                    format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
+                if let Some(key) = value.clone() {
+                    if env::var(key.clone()).is_ok() {
+                        println!("{}", env::var(key).unwrap());
+                        return;
+                    }
+                } else if only.is_some() {
+                    let mut any_miss = false;
+                    for key in only.as_ref().unwrap() {
+                        if env::var(key).is_err() {
+                            any_miss = true;
+                            break;
+                        }
+                    }
+                    if !any_miss {
+                        for key in only.as_ref().unwrap() {
+                            println!("{}={}", key, env::var(key).unwrap());
+                        }
+                        return;
+                    }
+                } else if env::var(passthrough_key).is_ok() {
+                    return;
+                }
+            }
             let parsed_env = dotenv_parser::parse_dotenv(
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
             .expect("Failed to parse dotenv contents");
             let filtered_env_contents = apply_only_exclude(parsed_env, only, exclude);
-            if let Some(key) = value {
+            if let Some(key) = value.clone() {
                 if let Some(val) = filtered_env_contents.get(&key) {
                     println!("{}", val);
                 } else {
@@ -374,12 +412,34 @@ fn main() {
             name,
             only,
             exclude,
+            passthrough,
         } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
             let contents = decrypt_file_contents(&file, &identities_file);
+            if passthrough {
+                let passthrough_key =
+                    format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
+                if env::var(passthrough_key).is_ok() {
+                    return;
+                } else if only.is_some() {
+                    let mut any_miss = false;
+                    for key in only.as_ref().unwrap() {
+                        if env::var(key).is_err() {
+                            any_miss = true;
+                            break;
+                        }
+                    }
+                    if !any_miss {
+                        for key in only.as_ref().unwrap() {
+                            println!("export {}={}", key, env::var(key).unwrap());
+                        }
+                        return;
+                    }
+                }
+            }
             let parsed_env = dotenv_parser::parse_dotenv(
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
@@ -445,6 +505,7 @@ fn main() {
             command,
             only,
             exclude,
+            passthrough,
         } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
@@ -455,6 +516,24 @@ fn main() {
             let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
             let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
 
+            if passthrough {
+                let passthrough_key =
+                    format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
+                if env::var(passthrough_key).is_ok() {
+                    return;
+                } else if only.is_some() {
+                    let mut any_miss = false;
+                    for key in only.as_ref().unwrap() {
+                        if env::var(key).is_err() {
+                            any_miss = true;
+                            break;
+                        }
+                    }
+                    if !any_miss {
+                        return;
+                    }
+                }
+            }
             let filtered_env = apply_only_exclude(parsed_env, only, exclude);
 
             let mut command_process = std::process::Command::new(command[0].clone());
@@ -462,6 +541,10 @@ fn main() {
             for (key, value) in filtered_env.iter() {
                 command_process.env(key, value);
             }
+            command_process.env(
+                format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_")),
+                "1",
+            );
             command_process.args(&command[1..]);
 
             let mut child = command_process.spawn().expect(&format!(
