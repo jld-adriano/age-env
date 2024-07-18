@@ -24,10 +24,10 @@ struct Args {
     /// Can be overridden by the AGE_ENV_CONFIG_DIR environment variables
     #[arg(short = 'd', long, env = "AGE_ENV_CONFIG_DIR", default_value_t = get_config_dir_path().to_str().unwrap().to_string())]
     config_dir: String,
-    #[arg(long, env = "AGE_ENV_IDENTITIES_FILE", default_value_t = get_config_dir_path().join("identities").to_str().unwrap().to_string())]
-    global_identities_file: String,
-    #[arg(long, env = "AGE_ENV_RECIPIENTS_FILE", default_value_t = get_config_dir_path().join("recipients").to_str().unwrap().to_string())]
-    global_recipients_file: String,
+    #[arg(long, env = "AGE_ENV_IDENTITIES_FILE")]
+    global_identities_file: Option<String>,
+    #[arg(long, env = "AGE_ENV_RECIPIENTS_FILE")]
+    global_recipients_file: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -173,6 +173,14 @@ fn main() {
     if !dir.exists() {
         fs::create_dir(&dir).expect("Failed to create config directory");
     }
+    let global_recipients_file_path = args
+        .global_recipients_file
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dir.join("recipients"));
+    let identities_file = args
+        .global_identities_file
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dir.join("identities"));
 
     let envs_dir = dir.join("envs");
     if !envs_dir.exists() {
@@ -186,7 +194,6 @@ fn main() {
         .into_iter()
         .any(|command| matches!(&args.command, command));
 
-    let identities_file = PathBuf::from(args.global_identities_file);
     if !identities_file.exists() && !is_pre_init_command {
         panic!(
             "Identities file {:?} does not exist. Run `age-env add-identity` to create it.",
@@ -194,7 +201,6 @@ fn main() {
         );
     }
 
-    let global_recipients_file_path = dir.join("recipients");
     let global_recipients_file_exists = global_recipients_file_path.exists();
     let global_recipients_file = match global_recipients_file_exists {
         true => Some(global_recipients_file_path.clone()),

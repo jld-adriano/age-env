@@ -94,9 +94,11 @@ run-local-flag delete test-env-3
 
 echo "----------------"
 echo "global files"
-echo $PUBLIC_KEY_3 | run-local-env add-recipient
+rm -rf ./local-config-dir
+mkdir -p ./local-config-dir
+echo $PUBLIC_KEY_2 | run-local-env add-recipient
 echo "TEST=globalval" | run-local-env create test-env-4
-AGE_ENV_RECIPIENTS_FILE=./local-config-dir/recipients AGE_ENV_IDENTITIES_FILE=./local-config-dir/identities run-local-env show test-env-4 | grep globalval
+AGE_ENV_IDENTITIES_FILE=./identities run-local-env show test-env-4 | grep globalval
 
 
 echo "----------------"
