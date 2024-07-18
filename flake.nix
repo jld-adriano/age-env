@@ -5,7 +5,7 @@
 
   outputs = { self, nixpkgs }:
     let
-      supportedSystems = [ "aarch64-darwin" ];
+      supportedSystems = [ "aarch64-darwin" "x86_64-darwin" "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgsFor = nixpkgs.legacyPackages;
     in {
