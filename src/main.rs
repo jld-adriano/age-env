@@ -364,7 +364,7 @@ fn main() {
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
-            let contents = decrypt_file_contents(&file, &identities_file);
+
             let passthrough_key = format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
             if passthrough {
                 if let Some(key) = value.clone() {
@@ -390,6 +390,7 @@ fn main() {
                     return;
                 }
             }
+            let contents = decrypt_file_contents(&file, &identities_file);
             let parsed_env = dotenv_parser::parse_dotenv(
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
@@ -420,7 +421,6 @@ fn main() {
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
-            let contents = decrypt_file_contents(&file, &identities_file);
             let passthrough_key = format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
             if passthrough {
                 if env::var(&passthrough_key).is_ok() {
@@ -441,6 +441,7 @@ fn main() {
                     }
                 }
             }
+            let contents = decrypt_file_contents(&file, &identities_file);
             let parsed_env = dotenv_parser::parse_dotenv(
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
@@ -515,10 +516,6 @@ fn main() {
             if !file.exists() {
                 panic!("Environment {:?} does not exist", file);
             }
-            let contents = decrypt_file_contents(&file, &identities_file);
-
-            let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
-            let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
 
             if passthrough {
                 let passthrough_key =
@@ -538,6 +535,10 @@ fn main() {
                     }
                 }
             }
+
+            let contents = decrypt_file_contents(&file, &identities_file);
+            let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
+            let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
             let filtered_env = apply_only_exclude(parsed_env, &only, &exclude);
 
             let mut command_process = std::process::Command::new(command[0].clone());
