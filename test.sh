@@ -182,3 +182,4 @@ TEST=otherval run show-for-eval --passthrough -o TEST test-env-9 | grep 'export 
 # How to test this one
 # TEST=otherval run show-for-eval --passthrough -o TEST -o NEW test-env-9 | grep 'export TEST=otherval' | grep 'export NEW=newval'
 TEST=otherval run run-with-env test-env-9 -- cargo run -q -- --config-dir=. show --passthrough test-env-9
+cargo run -q -- --config-dir=. show test-env-9 | grep '__passthrough_age_env_test_env_9=1'

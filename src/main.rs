@@ -333,7 +333,7 @@ fn main() {
             let parsed_env = dotenv_parser::parse_dotenv(&env_contents)
                 .expect("Failed to parse dotenv contents");
 
-            let filtered_env_contents = apply_only_exclude(parsed_env, only, exclude);
+            let filtered_env_contents = apply_only_exclude(parsed_env, &only, &exclude);
             let filtered_env_contents_string = filtered_env_contents
                 .iter()
                 .map(|(key, value)| format!("{}={}", key, value))
@@ -365,9 +365,8 @@ fn main() {
                 panic!("Environment {:?} does not exist", file);
             }
             let contents = decrypt_file_contents(&file, &identities_file);
+            let passthrough_key = format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
             if passthrough {
-                let passthrough_key =
-                    format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
                 if let Some(key) = value.clone() {
                     if env::var(key.clone()).is_ok() {
                         println!("{}", env::var(key).unwrap());
@@ -387,7 +386,7 @@ fn main() {
                         }
                         return;
                     }
-                } else if env::var(passthrough_key).is_ok() {
+                } else if env::var(&passthrough_key).is_ok() {
                     return;
                 }
             }
@@ -395,7 +394,7 @@ fn main() {
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
             .expect("Failed to parse dotenv contents");
-            let filtered_env_contents = apply_only_exclude(parsed_env, only, exclude);
+            let filtered_env_contents = apply_only_exclude(parsed_env, &only, &exclude);
             if let Some(key) = value.clone() {
                 if let Some(val) = filtered_env_contents.get(&key) {
                     println!("{}", val);
@@ -405,6 +404,9 @@ fn main() {
             } else {
                 for (key, value) in filtered_env_contents.iter() {
                     println!("{}={}", key, value);
+                }
+                if !&exclude.is_some() && !&only.is_some() {
+                    println!("{}={}", passthrough_key, "1");
                 }
             }
         }
@@ -419,10 +421,9 @@ fn main() {
                 panic!("Environment {:?} does not exist", file);
             }
             let contents = decrypt_file_contents(&file, &identities_file);
+            let passthrough_key = format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
             if passthrough {
-                let passthrough_key =
-                    format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
-                if env::var(passthrough_key).is_ok() {
+                if env::var(&passthrough_key).is_ok() {
                     return;
                 } else if only.is_some() {
                     let mut any_miss = false;
@@ -444,9 +445,12 @@ fn main() {
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
             .expect("Failed to parse dotenv contents");
-            let filtered_env_contents = apply_only_exclude(parsed_env, only, exclude);
+            let filtered_env_contents = apply_only_exclude(parsed_env, &only, &exclude);
             for (key, value) in filtered_env_contents.iter() {
                 println!("export {}={}", key, value);
+            }
+            if !&exclude.is_some() && !&only.is_some() {
+                println!("export {}={}", passthrough_key, "1");
             }
         }
         Command::Delete { name } => {
@@ -534,7 +538,7 @@ fn main() {
                     }
                 }
             }
-            let filtered_env = apply_only_exclude(parsed_env, only, exclude);
+            let filtered_env = apply_only_exclude(parsed_env, &only, &exclude);
 
             let mut command_process = std::process::Command::new(command[0].clone());
 
@@ -621,8 +625,8 @@ fn reencrypt(
 
 fn apply_only_exclude(
     parsed_env: BTreeMap<String, String>,
-    only: Option<Vec<String>>,
-    exclude: Option<Vec<String>>,
+    only: &Option<Vec<String>>,
+    exclude: &Option<Vec<String>>,
 ) -> BTreeMap<String, String> {
     let filtered_env_contents = if let Some(only_keys) = only {
         filter_env_contents(parsed_env, only_keys)
@@ -639,7 +643,7 @@ fn apply_only_exclude(
 
 fn exclude_env_contents(
     env_contents: BTreeMap<String, String>,
-    exclude_keys: Vec<String>,
+    exclude_keys: &Vec<String>,
 ) -> BTreeMap<String, String> {
     env_contents
         .into_iter()
@@ -648,7 +652,7 @@ fn exclude_env_contents(
 }
 fn filter_env_contents(
     env_contents: BTreeMap<String, String>,
-    only_keys: Vec<String>,
+    only_keys: &Vec<String>,
 ) -> BTreeMap<String, String> {
     env_contents
         .into_iter()
