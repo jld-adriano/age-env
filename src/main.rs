@@ -336,7 +336,7 @@ fn main() {
             let filtered_env_contents = apply_only_exclude(parsed_env, &only, &exclude);
             let filtered_env_contents_string = filtered_env_contents
                 .iter()
-                .map(|(key, value)| format!("{}={}", key, value))
+                .map(|(key, value)| format!("{}=\"{}\"", key, value))
                 .collect::<Vec<String>>()
                 .join("\n");
 
