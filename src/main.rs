@@ -180,7 +180,8 @@ fn main() {
         panic!("The 'age' command is required but it's not installed or not found in the PATH.");
     }
     let dir = Path::new(&args.config_dir);
-    if !dir.exists() && !matches!(args.command, Command::Generate { .. }) {
+    let should_try_to_create_dirs = !matches!(args.command, Command::Generate { .. });
+    if !dir.exists() && should_try_to_create_dirs {
         fs::create_dir(&dir).expect("Failed to create config directory");
     }
     let global_recipients_file_path = args
@@ -193,7 +194,7 @@ fn main() {
         .unwrap_or_else(|| dir.join("identities"));
 
     let envs_dir = dir.join("envs");
-    if !envs_dir.exists() {
+    if !envs_dir.exists() && should_try_to_create_dirs {
         fs::create_dir(&envs_dir).expect("Failed to create envs directory");
     }
 
@@ -204,7 +205,7 @@ fn main() {
         .into_iter()
         .any(|command| matches!(&args.command, command));
 
-    if !identities_file.exists() && !is_pre_init_command {
+    if !identities_file.exists() && !is_pre_init_command && should_try_to_create_dirs {
         panic!(
             "Identities file {:?} does not exist. Run `age-env add-identity` to create it.",
             identities_file
