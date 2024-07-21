@@ -6,6 +6,7 @@ mkdir test-output.generated
 cd test-output.generated
 
 alias run="cargo run -q -- --config-dir=."
+RUN="cargo run -q -- --config-dir=."
 
 echo "----------------"
 echo "init"
@@ -19,9 +20,11 @@ age-keygen > test-key-2.age
 cat test-key-2.age | run add-identity
 export PUBLIC_KEY_2=$(cat test-key-2.age | grep "public key" | cut -d ":" -f 2 | tr -d " ")
 
+
 echo "----------------"
 echo "create"
 echo "TEST=realval" | run create test-env-1
+
 
 echo "----------------"
 echo "create"
@@ -67,9 +70,19 @@ echo "show-for-eval"
 run show-for-eval test-env-1 | grep "export TEST=newval"
 
 echo "----------------"
+echo "preload"
+source <(run show-for-eval test-env-1 -l)
+echo $AGE_ENV_PRELOAD_B64 | grep test-env-1
+run show test-env-1 | grep newval
+unset AGE_ENV_PRELOAD_B64
+echo $AGE_ENV_PRELOAD_B64 | grep -v test-env-1
+
+
+echo "----------------"
 echo "delete"
 run delete test-env-1
 run delete test-env-2
+
 
 echo "local-config-dir"
 alias run-local-env="AGE_ENV_CONFIG_DIR=./local-config-dir cargo run -q --"

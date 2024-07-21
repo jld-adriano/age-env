@@ -1,3 +1,4 @@
+use base64::prelude::*;
 /**
  * @name age-env
  * @description A tool for managing encrypted environments for the age encryption tool
@@ -115,6 +116,9 @@ enum Command {
         only: Option<Vec<String>>,
         #[arg(short = 'e', long)]
         exclude: Option<Vec<String>>,
+        /// Preload the environment into an env var, for further use by other commands
+        #[arg(short = 'l', long)]
+        preload: bool,
         /// If environment is already decrypted, pass it through to the command without decrypting it again
         #[arg(short = 'p', long)]
         passthrough: bool,
@@ -396,7 +400,10 @@ fn main() {
                     return;
                 }
             }
-            let contents = decrypt_file_contents(&file, &identities_file);
+            let preloaded_content = decode_name_from_preload_data(name.clone());
+            let contents = preloaded_content
+                .map(|content| content.into_bytes())
+                .unwrap_or_else(|| decrypt_file_contents(&file, &identities_file));
             let parsed_env = dotenv_parser::parse_dotenv(
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
@@ -422,6 +429,7 @@ fn main() {
             only,
             exclude,
             passthrough,
+            preload,
         } => {
             let file = envs_dir.join(name.clone());
             if !file.exists() {
@@ -447,12 +455,22 @@ fn main() {
                     }
                 }
             }
-            let contents = decrypt_file_contents(&file, &identities_file);
+            let preloaded_content = decode_name_from_preload_data(name.clone());
+            let contents = if let Some(content) = preloaded_content {
+                content.into_bytes()
+            } else {
+                decrypt_file_contents(&file, &identities_file)
+            };
             let parsed_env = dotenv_parser::parse_dotenv(
                 &String::from_utf8(contents).expect("Failed to convert bytes to string"),
             )
             .expect("Failed to parse dotenv contents");
             let filtered_env_contents = apply_only_exclude(parsed_env, &only, &exclude);
+            if preload {
+                let new_preload_data = add_contents_to_preload_data(&filtered_env_contents, name);
+                println!("export AGE_ENV_PRELOAD_B64=\"{}\"", new_preload_data);
+                return;
+            }
             for (key, value) in filtered_env_contents.iter() {
                 println!("export {}={}", key, value);
             }
@@ -541,8 +559,10 @@ fn main() {
                     }
                 }
             }
-
-            let contents = decrypt_file_contents(&file, &identities_file);
+            let preloaded_content = decode_name_from_preload_data(name.clone());
+            let contents = preloaded_content
+                .map(|content| content.into_bytes())
+                .unwrap_or_else(|| decrypt_file_contents(&file, &identities_file));
             let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
             let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
             let filtered_env = apply_only_exclude(parsed_env, &only, &exclude);
@@ -608,6 +628,53 @@ fn main() {
             panic!("Generate command is handled above! Should never reach here")
         }
     }
+}
+
+fn add_contents_to_preload_data(
+    filtered_env_contents: &BTreeMap<String, String>,
+    name: String,
+) -> String {
+    let current_preload = env::var("AGE_ENV_PRELOAD_B64").unwrap_or_default();
+    if current_preload.contains(&format!("{}:", name)) {
+        return current_preload;
+    }
+    let contents_as_bytes = filtered_env_contents
+        .iter()
+        .map(|(key, value)| format!("{}={}", key, value))
+        .collect::<Vec<String>>()
+        .join("\n");
+    let encoded_data = base64::prelude::BASE64_STANDARD.encode(&contents_as_bytes);
+    let new_preload_data = format!(
+        "{}{}:{}",
+        if current_preload.is_empty() {
+            current_preload
+        } else {
+            current_preload + ";"
+        },
+        name,
+        encoded_data
+    );
+    new_preload_data
+}
+
+fn decode_name_from_preload_data(name: String) -> Option<String> {
+    let full_preload_data = env::var("AGE_ENV_PRELOAD_B64").unwrap_or_default();
+    let preload_data_parts = full_preload_data.split(";").collect::<Vec<&str>>();
+    let for_name_preload_data = preload_data_parts.iter().find(|x| x.starts_with(&name));
+    if for_name_preload_data.is_none() {
+        return None;
+    }
+    let base64_encoded_data = for_name_preload_data
+        .unwrap()
+        .split(":")
+        .nth(1)
+        .unwrap()
+        .to_string();
+    let decoded_data = base64::prelude::BASE64_STANDARD
+        .decode(&base64_encoded_data)
+        .unwrap();
+    let decoded_data = String::from_utf8(decoded_data).unwrap();
+    Some(decoded_data)
 }
 
 fn reencrypt(
