@@ -179,9 +179,8 @@ fn main() {
     if !which::which("age").is_ok() {
         panic!("The 'age' command is required but it's not installed or not found in the PATH.");
     }
-
     let dir = Path::new(&args.config_dir);
-    if !dir.exists() {
+    if !dir.exists() && !matches!(args.command, Command::Generate { .. }) {
         fs::create_dir(&dir).expect("Failed to create config directory");
     }
     let global_recipients_file_path = args
