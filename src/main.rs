@@ -566,7 +566,9 @@ fn main() {
             let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
             let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
             let filtered_env = apply_only_exclude(parsed_env, &only, &exclude);
-
+            if command.len() < 1 {
+                panic!("Command must have at least one argument, pass with -- [command]");
+            }
             let mut command_process = std::process::Command::new(command[0].clone());
 
             for (key, value) in filtered_env.iter() {
