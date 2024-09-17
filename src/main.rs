@@ -167,6 +167,9 @@ enum Command {
         /// If environment is already decrypted, pass it through to the command without decrypting it again
         #[arg(short = 'p', long)]
         passthrough: bool,
+        /// Specify a single environment variable to use
+        #[arg(short = 'v', long)]
+        value: Option<String>,
     },
     /// Generate shell completions
     #[command(alias = "g")]
@@ -535,6 +538,7 @@ fn main() {
             only,
             exclude,
             passthrough,
+            value,
         } => {
             let filtered_env = if name == "-" {
                 // Read from stdin
@@ -581,9 +585,18 @@ fn main() {
             }
             let mut command_process = std::process::Command::new(&command[0]);
 
-            for (key, value) in filtered_env.iter() {
-                command_process.env(key, value);
+            if let Some(key) = value {
+                if let Some(val) = filtered_env.get(&key) {
+                    command_process.env(key, val);
+                } else {
+                    panic!("Key {} not found in environment", key);
+                }
+            } else {
+                for (key, value) in filtered_env.iter() {
+                    command_process.env(key, value);
+                }
             }
+
             if name != "-" {
                 command_process.env(
                     format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_")),

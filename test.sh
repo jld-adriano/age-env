@@ -209,3 +209,16 @@ OTHER=otherstdinval' | run run-with-env - --only TEST -- zsh -c 'echo "$TEST"; e
 echo "run-with-env with stdin input and --exclude"
 echo 'TEST=stdinval
 OTHER=otherstdinval' | run run-with-env - --exclude OTHER -- zsh -c 'echo "$TEST"; echo "$OTHER"' | grep 'stdinval' | grep -v 'otherstdinval'
+
+echo "----------------"
+echo "run-with-env with --value"
+echo 'TEST=realval
+OTHER=otherval' | run create test-env-10
+run run-with-env test-env-10 --value TEST -- zsh -c 'echo "$TEST"; echo "$OTHER"' | grep realval | grep -v otherval
+
+if run run-with-env test-env-10 --value NONEXISTENT -- zsh -c 'echo "This should not run"' >/dev/null 2>&1; then
+    echo "Error: Key NONEXISTENT did not cause an error in run-with-env"
+    exit 1
+else
+    echo "Key NONEXISTENT not found in run-with-env. This is as expected"
+fi
