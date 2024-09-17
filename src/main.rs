@@ -536,48 +536,60 @@ fn main() {
             exclude,
             passthrough,
         } => {
-            let file = envs_dir.join(name.clone());
-            if !file.exists() {
-                panic!("Environment {:?} does not exist", file);
-            }
+            let filtered_env = if name == "-" {
+                // Read from stdin
+                let mut stdin_contents = String::new();
+                io::stdin().read_to_string(&mut stdin_contents)
+                    .expect("Failed to read from stdin");
+                let parsed_env = dotenv_parser::parse_dotenv(&stdin_contents)
+                    .expect("Failed to parse dotenv from stdin");
+                apply_only_exclude(parsed_env, &only, &exclude)
+            } else {
+                let file = envs_dir.join(name.clone());
+                if !file.exists() {
+                    panic!("Environment {:?} does not exist", file);
+                }
 
-            if passthrough {
-                let passthrough_key =
-                    format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
-                if env::var(passthrough_key).is_ok() {
-                    return;
-                } else if only.is_some() {
-                    let mut any_miss = false;
-                    for key in only.as_ref().unwrap() {
-                        if env::var(key).is_err() {
-                            any_miss = true;
-                            break;
+                if passthrough {
+                    let passthrough_key = format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
+                    if env::var(&passthrough_key).is_ok() {
+                        return;
+                    } else if only.is_some() {
+                        let mut any_miss = false;
+                        for key in only.as_ref().unwrap() {
+                            if env::var(key).is_err() {
+                                any_miss = true;
+                                break;
+                            }
+                        }
+                        if !any_miss {
+                            return;
                         }
                     }
-                    if !any_miss {
-                        return;
-                    }
                 }
-            }
-            let preloaded_content = decode_name_from_preload_data(name.clone());
-            let contents = preloaded_content
-                .map(|content| content.into_bytes())
-                .unwrap_or_else(|| decrypt_file_contents(&file, &identities_file));
-            let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
-            let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
-            let filtered_env = apply_only_exclude(parsed_env, &only, &exclude);
+                let preloaded_content = decode_name_from_preload_data(name.clone());
+                let contents = preloaded_content
+                    .map(|content| content.into_bytes())
+                    .unwrap_or_else(|| decrypt_file_contents(&file, &identities_file));
+                let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
+                let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
+                apply_only_exclude(parsed_env, &only, &exclude)
+            };
+
             if command.len() < 1 {
                 panic!("Command must have at least one argument, pass with -- [command]");
             }
-            let mut command_process = std::process::Command::new(command[0].clone());
+            let mut command_process = std::process::Command::new(&command[0]);
 
             for (key, value) in filtered_env.iter() {
                 command_process.env(key, value);
             }
-            command_process.env(
-                format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_")),
-                "1",
-            );
+            if name != "-" {
+                command_process.env(
+                    format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_")),
+                    "1",
+                );
+            }
             command_process.args(&command[1..]);
 
             let mut child = command_process.spawn().expect(&format!(

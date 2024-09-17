@@ -196,3 +196,16 @@ TEST=otherval run show-for-eval --passthrough -o TEST test-env-9 | grep 'export 
 # TEST=otherval run show-for-eval --passthrough -o TEST -o NEW test-env-9 | grep 'export TEST=otherval' | grep 'export NEW=newval'
 TEST=otherval run run-with-env test-env-9 -- cargo run -q -- --config-dir=. show --passthrough test-env-9
 cargo run -q -- --config-dir=. show test-env-9 | grep '__passthrough_age_env_test_env_9=1'
+
+echo "----------------"
+echo "run-with-env with stdin input"
+echo 'TEST=stdinval
+OTHER=otherstdinval' | run run-with-env - -- zsh -c 'echo "$TEST $OTHER"' | grep 'stdinval otherstdinval'
+
+echo "run-with-env with stdin input and --only"
+echo 'TEST=stdinval
+OTHER=otherstdinval' | run run-with-env - --only TEST -- zsh -c 'echo "$TEST"; echo "$OTHER"' | grep 'stdinval' | grep -v 'otherstdinval'
+
+echo "run-with-env with stdin input and --exclude"
+echo 'TEST=stdinval
+OTHER=otherstdinval' | run run-with-env - --exclude OTHER -- zsh -c 'echo "$TEST"; echo "$OTHER"' | grep 'stdinval' | grep -v 'otherstdinval'
