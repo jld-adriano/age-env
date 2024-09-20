@@ -241,6 +241,8 @@ fn main() {
                 false => File::create(&identities_file).expect("Failed to create identities file"),
             };
 
+            println!("Adding identity to file: {:?}", identities_file);
+
             let mut identities = String::new();
             std::io::stdin()
                 .read_to_string(&mut identities)
@@ -260,6 +262,10 @@ fn main() {
             };
 
             let mut recipients = String::new();
+            println!(
+                "Adding recipient to file: {:?}",
+                global_recipients_file_path
+            );
             std::io::stdin()
                 .read_to_string(&mut recipients)
                 .expect("Failed to read recipients from stdin");
@@ -543,7 +549,8 @@ fn main() {
             let filtered_env = if name == "-" {
                 // Read from stdin
                 let mut stdin_contents = String::new();
-                io::stdin().read_to_string(&mut stdin_contents)
+                io::stdin()
+                    .read_to_string(&mut stdin_contents)
                     .expect("Failed to read from stdin");
                 let parsed_env = dotenv_parser::parse_dotenv(&stdin_contents)
                     .expect("Failed to parse dotenv from stdin");
@@ -555,7 +562,8 @@ fn main() {
                 }
 
                 if passthrough {
-                    let passthrough_key = format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
+                    let passthrough_key =
+                        format!("{}{}", PASSTHROUGH_ENV_PREFIX, name.replace("-", "_"));
                     if env::var(&passthrough_key).is_ok() {
                         return;
                     } else if only.is_some() {
@@ -575,8 +583,10 @@ fn main() {
                 let contents = preloaded_content
                     .map(|content| content.into_bytes())
                     .unwrap_or_else(|| decrypt_file_contents(&file, &identities_file));
-                let source = &String::from_utf8(contents).expect("Failed to convert stdout to string");
-                let parsed_env = dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
+                let source =
+                    &String::from_utf8(contents).expect("Failed to convert stdout to string");
+                let parsed_env =
+                    dotenv_parser::parse_dotenv(source).expect("Failed to parse dotenv");
                 apply_only_exclude(parsed_env, &only, &exclude)
             };
 
